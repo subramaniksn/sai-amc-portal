@@ -5,9 +5,20 @@ function Navbar() {
   const navigate = useNavigate();
   const location = useLocation();
 
-  const user = JSON.parse(localStorage.getItem("user") || "{}");
+  // ✅ SAFE USER PARSE
+  let user = {};
+  try {
+    const storedUser = localStorage.getItem("user");
 
-  const isViewer = user.role === "viewer";
+    if (storedUser && storedUser !== "undefined" && storedUser !== "null") {
+      user = JSON.parse(storedUser);
+    }
+  } catch (err) {
+    console.error("Invalid user data in localStorage:", err);
+    user = {};
+  }
+
+  const isViewer = user?.role === "viewer";
   const isDashboard = location.pathname === "/dashboard";
 
   const handleLogout = () => {
@@ -19,7 +30,6 @@ function Navbar() {
   return (
     <AppBar position="static">
       <Toolbar>
-
         <Typography variant="h6" sx={{ flexGrow: 1 }}>
           {isViewer ? "Viewer AMC Dashboard" : "AMC Dashboard"}
         </Typography>
@@ -52,7 +62,6 @@ function Navbar() {
             )}
           </>
         )}
-
       </Toolbar>
     </AppBar>
   );
