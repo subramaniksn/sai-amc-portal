@@ -2,7 +2,10 @@ import axios from "axios";
 
 // Create Axios instance
 const api = axios.create({
-  baseURL: "http://35.154.47.168:5002"
+  baseURL:
+    window.location.hostname === "localhost"
+      ? "http://localhost:5000/api"
+      : "http://35.154.47.168:5002/api"
 });
 
 // Request interceptor to add token

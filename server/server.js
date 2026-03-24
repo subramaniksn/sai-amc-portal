@@ -29,7 +29,8 @@ app.use("/api/invoice", invoiceRoutes);
 // =========================
 app.use(express.static(path.join(__dirname, "../client/build")));
 
-app.get("*", (req, res) => {
+// ✅ FIXED LINE HERE
+app.get(/.*/, (req, res) => {
   res.sendFile(path.join(__dirname, "../client/build/index.html"));
 });
 
