@@ -4,7 +4,22 @@ import ManagerDashboard from "./ManagerDashboard";
 
 export default function Dashboard() {
 
-  const user = JSON.parse(localStorage.getItem("user") || "{}");
+  let user = null;
+
+  try {
+    const userData = localStorage.getItem("user");
+    user = userData ? JSON.parse(userData) : null;
+  } catch (error) {
+    console.error("Invalid user data in localStorage:", error);
+    user = null;
+  }
+
+  // 🔐 If not logged in → redirect
+  if (!user) {
+    window.location.href = "/";
+    return null;
+  }
+
   const role = user.role;
 
   if (role === "Admin") {
