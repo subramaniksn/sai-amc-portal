@@ -95,6 +95,7 @@ router.get("/invoice-list/:type", verifyToken, async (req, res) => {
       JOIN amc_site_entry a ON a.id = i.amc_id
       WHERE i.invoice_raised = false
       AND i.payment_received = false
+      AND i.due_date <= CURRENT_DATE + INTERVAL '30 days'
       ORDER BY i.due_date
       `;
     }
@@ -169,6 +170,7 @@ router.get("/invoice-summary", verifyToken, async (req, res) => {
         COUNT(*) FILTER (
           WHERE invoice_raised = false
           AND payment_received = false
+          AND due_date <= CURRENT_DATE + INTERVAL '30 days'
         ) AS due,
 
         COUNT(*) FILTER (
