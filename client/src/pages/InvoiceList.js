@@ -107,7 +107,7 @@ export default function InvoiceList() {
             {/* HEADER */}
             <TableHead>
               <TableRow>
-                {["Plant Name", "Customer", "Quarter", "Due Date", "Status"].map((head) => (
+                {["Plant Name", "Customer", "PO Number", "Quarter", "Due Date", "Status"].map((head) => (
                   <TableCell
                     key={head}
                     sx={{
@@ -135,6 +135,7 @@ export default function InvoiceList() {
                 >
                   <TableCell>{d.plant_name}</TableCell>
                   <TableCell>{d.customer_name}</TableCell>
+                  <TableCell>{d.po_number}</TableCell>
                   <TableCell>Q{d.period_number}</TableCell>
                   <TableCell>{formatDate(d.due_date)}</TableCell>
                   <TableCell sx={{ fontWeight: "bold" }}>

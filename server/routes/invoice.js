@@ -84,6 +84,7 @@ router.get("/invoice-list/:type", verifyToken, async (req, res) => {
       SELECT
         a.customer_name,
         a.plant_name,
+        i.po_number,
         i.period_number,
         TO_CHAR(i.due_date,'YYYY-MM-DD') AS due_date,
         CASE
@@ -110,6 +111,7 @@ router.get("/invoice-list/:type", verifyToken, async (req, res) => {
       SELECT
         a.customer_name,
         a.plant_name,
+        i.po_number,
         i.period_number,
         TO_CHAR(i.due_date,'YYYY-MM-DD') AS due_date,
         'Payment Pending' AS invoice_status
@@ -131,6 +133,7 @@ router.get("/invoice-list/:type", verifyToken, async (req, res) => {
       SELECT
         a.customer_name,
         a.plant_name,
+        i.po_number,
         i.period_number,
         TO_CHAR(i.due_date,'YYYY-MM-DD') AS due_date,
         'Paid' AS invoice_status
