@@ -10,7 +10,11 @@ import {
   Button,
   Box,
   Alert,
-  Chip
+  Chip,
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem
 } from "@mui/material";
 import {
   BarChart,
@@ -22,73 +26,89 @@ import {
 } from "recharts";
 
 export default function AdminDashboard() {
+
   const [data, setData] = useState([]);
   const [upcoming, setUpcoming] = useState([]);
+  const [pendingCustomer, setPendingCustomer] = useState([]);
   const [invoiceSummary, setInvoiceSummary] = useState({
     due: 0,
     pending: 0,
     paid: 0
   });
 
+  const [yearList, setYearList] = useState([]);
+  const [period, setPeriod] = useState("");
+
   const navigate = useNavigate();
   const user = JSON.parse(localStorage.getItem("user") || "{}");
   const role = user.role;
-  const [pendingCustomer, setPendingCustomer] = useState([]);
 
-  const fetchPendingCustomer = async () => {
+  // ===============================
+  // AUTO YEAR GENERATION
+  // ===============================
+  useEffect(() => {
+    const currentYear = new Date().getFullYear();
+
+    const years = [];
+    for (let i = currentYear - 2; i <= currentYear + 5; i++) {
+      years.push(`${i}-${i + 1}`);
+    }
+
+    setYearList(years);
+    setPeriod(`${currentYear}-${currentYear + 1}`);
+  }, []);
+
+  // ===============================
+  // FETCH DATA
+  // ===============================
+  useEffect(() => {
+    if (!period) return;
+
+    const year = period.split("-")[0];
+
+    fetchData(year);
+    fetchInvoiceSummary(year);
+    fetchPendingCustomer(year);
+
+  }, [period]);
+
+  const fetchData = async (year) => {
     try {
-      const res = await api.get("/amc/pending-by-customer");
+      const res = await api.get("/amc", { params: { year } });
+      setData(res.data);
+
+      const upcomingRes = await api.get("/amc/upcoming", { params: { year } });
+      setUpcoming(upcomingRes.data);
+
+    } catch (err) {
+      console.error("Fetch Data Error:", err);
+    }
+  };
+
+  const fetchPendingCustomer = async (year) => {
+    try {
+      const res = await api.get("/amc/pending-by-customer", {
+        params: { year }
+      });
       setPendingCustomer(res.data);
     } catch (err) {
       console.error("Pending Customer Error:", err);
     }
   };
 
-  useEffect(() => {
-    fetchData();
-    fetchInvoiceSummary();
-    fetchPendingCustomer();
-  }, []);
-
-  const getPendingForPlant = (plantName) => {
-    const p = pendingCustomer.find(
-      (row) => row.plant_name === plantName
-    );
-
-    return {
-      pending: p?.pending_amount || 0,
-      received: p?.received_amount || 0
-    };
-  };
-  
-  const fetchData = async () => {
+  const fetchInvoiceSummary = async (year) => {
     try {
-      // Fetch AMC data (aggregated totals from invoice_schedule)
-      const res = await api.get("/amc");
-      setData(res.data);
-
-      // Fetch upcoming invoices
-      const upcomingRes = await api.get("/amc/upcoming");
-      setUpcoming(upcomingRes.data);
-    } catch (err) {
-      console.error("Fetch Data Error:", err);
-    }
-  };
-
-  const fetchInvoiceSummary = async () => {
-    try {
-      const res = await api.get("/invoice/invoice-summary");
+      const res = await api.get("/invoice/invoice-summary", {
+        params: { year }
+      });
       setInvoiceSummary(res.data);
     } catch (err) {
       console.error("Invoice Summary Error:", err);
     }
-  };  
-
-  const formatCurrency = (num) =>
-    new Intl.NumberFormat("en-IN").format(num || 0);
+  };
 
   // ===============================
-  // FINANCIAL CALCULATIONS
+  // CALCULATIONS
   // ===============================
   const totalAmount = pendingCustomer.reduce(
     (sum, row) => sum + Number(row.total_amount_without_gst || 0),
@@ -105,6 +125,20 @@ export default function AdminDashboard() {
     0
   );
 
+  const formatCurrency = (num) =>
+    new Intl.NumberFormat("en-IN").format(num || 0);
+
+  const getPendingForPlant = (plantName) => {
+    const p = pendingCustomer.find(
+      (row) => row.plant_name === plantName
+    );
+
+    return {
+      pending: p?.pending_amount || 0,
+      received: p?.received_amount || 0
+    };
+  };
+
   // ===============================
   // CHART DATA
   // ===============================
@@ -117,8 +151,39 @@ export default function AdminDashboard() {
     <Container maxWidth="xl">
 
       <Typography variant="h4" gutterBottom>
-        AMC Dashboard
+        AMC Dashboard ({period})
       </Typography>
+
+      {/* YEAR FILTER */}
+      <Box sx={{ mb: 3, width: 250 }}>
+        <FormControl fullWidth size="small">
+          <InputLabel>Period</InputLabel>
+          <Select
+            value={period}
+            label="Period"
+            onChange={(e) => setPeriod(e.target.value)}
+          >
+            {yearList.map((y) => (
+              <MenuItem key={y} value={y}>{y}</MenuItem>
+            ))}
+          </Select>
+        </FormControl>
+      </Box>
+
+      {/* AMC ENDING ALERT */}
+      {upcoming.length > 0 && (
+        <Box sx={{ mb: 3 }}>
+          <Alert severity="error">
+            {upcoming.length} AMC(s) ending soon:{" "}
+            {upcoming
+              //.slice(0, 3) // show first 3
+              .map((u) => u.plant_name)
+              .join(", ")
+            }
+            {upcoming.length > 3 && "..."}
+          </Alert>
+        </Box>
+      )}
 
       {/* KPI CARDS */}
       <Grid container spacing={3} sx={{ mb: 4 }}>
@@ -158,15 +223,11 @@ export default function AdminDashboard() {
 
       </Grid>
 
-      {/* INVOICE STATUS CARDS */}
+      {/* INVOICE STATUS */}
       <Grid container spacing={3} sx={{ mb: 4 }}>
 
         <Grid item xs={12} md={4}>
-          <Card
-            elevation={4}
-            sx={{ cursor: "pointer" }}
-            onClick={() => navigate("/invoice-list/due")}
-          >
+          <Card sx={{ cursor: "pointer" }} onClick={() => navigate("/invoice-list/due")}>
             <CardContent>
               <Typography variant="h6">Due Invoices</Typography>
               <Typography variant="h4" color="error">
@@ -177,11 +238,7 @@ export default function AdminDashboard() {
         </Grid>
 
         <Grid item xs={12} md={4}>
-          <Card
-            elevation={4}
-            sx={{ cursor: "pointer" }}
-            onClick={() => navigate("/invoice-list/pending")}
-          >
+          <Card sx={{ cursor: "pointer" }} onClick={() => navigate("/invoice-list/pending")}>
             <CardContent>
               <Typography variant="h6">Pending Payment</Typography>
               <Typography variant="h4" color="warning.main">
@@ -192,11 +249,7 @@ export default function AdminDashboard() {
         </Grid>
 
         <Grid item xs={12} md={4}>
-          <Card
-            elevation={4}
-            sx={{ cursor: "pointer" }}
-            onClick={() => navigate("/invoice-list/paid")}
-          >
+          <Card sx={{ cursor: "pointer" }} onClick={() => navigate("/invoice-list/paid")}>
             <CardContent>
               <Typography variant="h6">Paid Invoices</Typography>
               <Typography variant="h4" color="success.main">
@@ -208,56 +261,6 @@ export default function AdminDashboard() {
 
       </Grid>
 
-      {/* UPCOMING ALERT */}
-      {upcoming.length > 0 && (
-        <Box sx={{ mb: 3 }}>
-          <Alert severity="warning">
-            {upcoming.length} Invoice(s) to be raised within 7 days!
-          </Alert>
-        </Box>
-      )}
-
-      {/* ACTION BUTTONS */}
-      <Box sx={{ mb: 3 }}>
-        {role === "Admin" && (
-          <Button
-            variant="contained"
-            component={Link}
-            to="/add-amc"
-            sx={{ mr: 2 }}
-          >
-            Add AMC
-          </Button>
-        )}
-
-        <Button
-          variant="outlined"
-          color="secondary"
-          onClick={async () => {
-            try {
-              const token = localStorage.getItem("token");
-              const response = await api.get("/amc/export", {
-                responseType: "blob",
-                headers: { Authorization: `Bearer ${token}` }
-              });
-              const blob = new Blob([response.data], {
-                type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-              });
-              const url = window.URL.createObjectURL(blob);
-              const a = document.createElement("a");
-              a.href = url;
-              a.download = "amc-data.xlsx";
-              a.click();
-              window.URL.revokeObjectURL(url);
-            } catch (error) {
-              alert("Export failed");
-            }
-          }}
-        >
-          Export Excel
-        </Button>
-      </Box>
-
       {/* BAR CHART */}
       <Card sx={{ mb: 4 }}>
         <CardContent>
@@ -265,16 +268,13 @@ export default function AdminDashboard() {
             Pending Amount by Customer
           </Typography>
           <ResponsiveContainer width="100%" height={300}>
-            <BarChart 
-              data={chartData} 
-              margin={{ bottom: 80 }} // space for rotated labels
-            >              
+            <BarChart data={chartData} margin={{ bottom: 80 }}>
               <XAxis
                 dataKey="customer_name"
                 tick={{ fontSize: 12 }}
-                angle={-35}           // rotate labels
-                textAnchor="end"       // align rotated text
-                interval={0}           // show all labels
+                angle={-35}
+                textAnchor="end"
+                interval={0}
               />
               <YAxis />
               <Tooltip />
@@ -284,22 +284,32 @@ export default function AdminDashboard() {
         </CardContent>
       </Card>
 
+      <Box sx={{ mb: 3 }}>
+        {role?.toLowerCase() === "admin" && (
+          <Button
+            variant="contained"
+            component={Link}
+            to="/add-amc"
+            sx={{ mr: 2 }}
+          >
+            Add AMC
+          </Button>
+        )}
+      </Box>
+      
       {/* AMC LIST */}
       <Grid container spacing={3}>
         {data.map((d) => {
 
           const payment = getPendingForPlant(d.plant_name);
 
-          const pending = payment.pending;
-          const received = payment.received;
-
           let status = "Pending";
           let color = "error";
 
-          if (pending === 0) {
+          if (payment.pending === 0) {
             status = "Paid";
             color = "success";
-          } else if (received > 0) {
+          } else if (payment.received > 0) {
             status = "Partial";
             color = "warning";
           }
@@ -309,11 +319,19 @@ export default function AdminDashboard() {
               <Card elevation={3}>
                 <CardContent>
                   <Typography variant="h6">{d.plant_name}</Typography>
-                  <Typography>Pending: ₹ {formatCurrency(pending)}</Typography>
-                  <Typography>Received: ₹ {formatCurrency(received)}</Typography>
+
+                  <Typography>
+                    Pending: ₹ {formatCurrency(payment.pending)}
+                  </Typography>
+
+                  <Typography>
+                    Received: ₹ {formatCurrency(payment.received)}
+                  </Typography>
+
                   <Box sx={{ mt: 1 }}>
                     <Chip label={status} color={color} size="small" />
                   </Box>
+
                   {role === "Admin" && (
                     <Button
                       component={Link}
@@ -324,6 +342,7 @@ export default function AdminDashboard() {
                       Edit
                     </Button>
                   )}
+
                 </CardContent>
               </Card>
             </Grid>

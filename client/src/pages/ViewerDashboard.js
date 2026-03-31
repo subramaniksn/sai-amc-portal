@@ -14,7 +14,12 @@ import {
   TableBody,
   TableCell,
   TableHead,
-  TableRow
+  TableRow,
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem,
+  Alert
 } from "@mui/material";
 
 import {
@@ -45,14 +50,43 @@ export default function ViewerDashboard() {
     paid: 0
   });
 
+  // ✅ NEW STATES
+  const [yearList, setYearList] = useState([]);
+  const [period, setPeriod] = useState("");
+  const [endingAMC, setEndingAMC] = useState([]);
+
+  // ===============================
+  // AUTO YEAR GENERATE
+  // ===============================
   useEffect(() => {
-    fetchSites();
-    fetchInvoiceSummary();
+    const currentYear = new Date().getFullYear();
+
+    const years = [];
+    for (let i = currentYear - 2; i <= currentYear + 5; i++) {
+      years.push(`${i}-${i + 1}`);
+    }
+
+    setYearList(years);
+    setPeriod(`${currentYear}-${currentYear + 1}`);
   }, []);
 
-  const fetchSites = async () => {
+  // ===============================
+  // FETCH BASE DATA
+  // ===============================
+  useEffect(() => {
+    if (!period) return;
+
+    const year = period.split("-")[0];
+
+    fetchSites(year);
+    fetchInvoiceSummary(year);   // ✅ FIXED
+    fetchEndingAMC(year);
+
+  }, [period]);
+
+  const fetchSites = async (year) => {
     try {
-      const res = await api.get("/amc");
+      const res = await api.get("/amc", { params: { year } });
       const data = res.data || [];
       setSites(data);
       setFilteredSites(data);
@@ -61,12 +95,29 @@ export default function ViewerDashboard() {
     }
   };
 
-  const fetchInvoiceSummary = async () => {
+  const fetchInvoiceSummary = async (year) => {
     try {
-      const res = await api.get("/invoice/invoice-summary");
+      const res = await api.get("/invoice/invoice-summary", {
+        params: { year }
+      });
       setInvoiceSummary(res.data);
     } catch (err) {
       console.error("Invoice Summary Error:", err);
+    }
+  };
+
+  // ✅ AMC ENDING API
+  const fetchEndingAMC = async (year) => {
+    try {
+      const res = await api.get("/amc/upcoming", {
+        params: { year }
+      });
+
+      console.log("VIEWER AMC:", res.data); // debug
+
+      setEndingAMC(res.data);
+    } catch (err) {
+      console.error("Ending AMC Error:", err);
     }
   };
 
@@ -94,15 +145,10 @@ export default function ViewerDashboard() {
 
   // GROUP FOR CHART
   const grouped = filteredSites.reduce((acc, site) => {
-
     const customer = site.customer_name || "Unknown";
-
     if (!acc[customer]) acc[customer] = [];
-
     acc[customer].push(site);
-
     return acc;
-
   }, {});
 
   const chartData = Object.entries(grouped).map(([customer, customerSites]) => ({
@@ -128,42 +174,32 @@ export default function ViewerDashboard() {
     if (siteCountFilter) {
 
       const groupedTemp = data.reduce((acc, s) => {
-
         if (!acc[s.customer_name]) acc[s.customer_name] = [];
-
         acc[s.customer_name].push(s);
-
         return acc;
-
       }, {});
 
       data = Object.values(groupedTemp)
         .filter(sites => sites.length >= parseInt(siteCountFilter))
         .flat();
-
     }
 
     setFilteredSites(data);
     setSelectedCustomer(null);
-
   };
 
   // CHART CLICK
   const handleBarClick = (data) => {
-
     if (!data || !data.customer) return;
 
-    const customer = data.customer;
-
     const sitesOfCustomer = filteredSites.filter(
-      s => s.customer_name === customer
+      s => s.customer_name === data.customer
     );
 
     setSelectedCustomer({
-      name: customer,
+      name: data.customer,
       sites: sitesOfCustomer
     });
-
   };
 
   const barColors = ["#ff9800", "#1976d2", "#2e7d32", "#d32f2f", "#7b1fa2"];
@@ -171,7 +207,35 @@ export default function ViewerDashboard() {
   return (
     <Container maxWidth="lg">
 
-      {/* DASHBOARD CARDS */}
+      {/* ✅ YEAR SELECT */}
+      <Box sx={{ mb: 3, width: 250 }}>
+        <FormControl fullWidth size="small">
+          <InputLabel>Period</InputLabel>
+          <Select
+            value={period}
+            label="Period"
+            onChange={(e) => setPeriod(e.target.value)}
+          >
+            {yearList.map((y) => (
+              <MenuItem key={y} value={y}>{y}</MenuItem>
+            ))}
+          </Select>
+        </FormControl>
+      </Box>
+
+      {/* ✅ AMC ENDING ALERT */}
+      {endingAMC.length > 0 && (
+        <Box sx={{ mb: 3 }}>
+          <Alert severity="error">
+            {endingAMC.length} AMC(s) ending soon:{" "}
+            {endingAMC.map((a) => a.plant_name).join(", ")}
+            {endingAMC.length > 6 && "..."}
+          </Alert>
+        </Box>
+      )}
+
+      {/* ===== YOUR ORIGINAL UI BELOW (UNCHANGED) ===== */}
+
       <Grid container spacing={3} sx={{ mb: 4 }}>
 
         <Grid item xs={12} md={2}>

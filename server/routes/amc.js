@@ -179,7 +179,9 @@ router.post("/", verifyToken, async (req, res) => {
 router.get("/", async (req, res) => {
   try {
 
-    const result = await pool.query(`
+    const { year } = req.query;
+
+    let query = `
       SELECT 
         a.*,
         MAX(i.po_number) AS po_number,
@@ -187,9 +189,22 @@ router.get("/", async (req, res) => {
       FROM amc_site_entry a
       LEFT JOIN invoice_schedule i
       ON a.id = i.amc_id
+    `;
+
+    const values = [];
+
+    // ✅ APPLY FILTER ONLY IF YEAR PASSED
+    if (year) {
+      query += ` WHERE EXTRACT(YEAR FROM a.amc_start_date) = $1 `;
+      values.push(year);
+    }
+
+    query += `
       GROUP BY a.id
       ORDER BY a.id
-    `);
+    `;
+
+    const result = await pool.query(query, values);
 
     res.json(result.rows);
 
@@ -339,30 +354,39 @@ router.get("/dashboard", verifyToken, async (req, res) => {
 // ========================================
 
 router.get("/upcoming", verifyToken, async (req, res) => {
-
   try {
 
-    const result = await pool.query(`
+    const { year } = req.query;
+
+    let query = `
       SELECT
         customer_name,
         plant_name,
         amc_start_date,
         amc_end_date
       FROM amc_site_entry
-      WHERE amc_start_date >= CURRENT_DATE
-      ORDER BY amc_start_date
-      LIMIT 10
-    `);
+      WHERE amc_end_date BETWEEN CURRENT_DATE 
+      AND CURRENT_DATE + INTERVAL '30 days'
+    `;
+
+    const values = [];
+
+    // ✅ APPLY YEAR FILTER (based on AMC start year)
+    if (year) {
+      query += ` AND EXTRACT(YEAR FROM amc_start_date) = $1 `;
+      values.push(year);
+    }
+
+    query += ` ORDER BY amc_end_date`;
+
+    const result = await pool.query(query, values);
 
     res.json(result.rows);
 
   } catch (err) {
-
-    console.error("UPCOMING AMC ERROR:", err);
+    console.error("ENDING AMC ERROR:", err);
     res.status(500).json({ error: err.message });
-
   }
-
 });
 
 // ========================================
@@ -415,41 +439,41 @@ router.get("/export", async (req, res) => {
 router.get("/pending-by-customer", verifyToken, async (req, res) => {
   try {
 
-    const result = await pool.query(`
+    const { year } = req.query;
+
+    let query = `
       SELECT
         a.customer_name,
         a.plant_name,
         a.total_amount_without_gst,
 
         COALESCE(SUM(
-          CASE
-            WHEN i.payment_received = true
-            THEN i.amount
-            ELSE 0
-          END
+          CASE WHEN i.payment_received = true THEN i.amount ELSE 0 END
         ),0) AS received_amount,
 
         a.total_amount_without_gst -
         COALESCE(SUM(
-          CASE
-            WHEN i.payment_received = true
-            THEN i.amount
-            ELSE 0
-          END
+          CASE WHEN i.payment_received = true THEN i.amount ELSE 0 END
         ),0) AS pending_amount
 
       FROM amc_site_entry a
       LEFT JOIN invoice_schedule i
       ON a.id = i.amc_id
+    `;
 
-      GROUP BY
-        a.id,
-        a.customer_name,
-        a.plant_name,
-        a.total_amount_without_gst
+    const values = [];
 
+    if (year) {
+      query += ` WHERE EXTRACT(YEAR FROM a.amc_start_date) = $1 `;
+      values.push(year);
+    }
+
+    query += `
+      GROUP BY a.id, a.customer_name, a.plant_name, a.total_amount_without_gst
       ORDER BY pending_amount DESC
-    `);
+    `;
+
+    const result = await pool.query(query, values);
 
     res.json(result.rows);
 
@@ -484,6 +508,35 @@ router.get("/:id", verifyToken, async (req, res) => {
 
   }
 
+});
+
+router.get("/ending-soon", verifyToken, async (req, res) => {
+  try {
+    const { year } = req.query;
+
+    let query = `
+      SELECT customer_name, plant_name, amc_end_date
+      FROM amc_site_entry
+      WHERE amc_end_date BETWEEN CURRENT_DATE
+      AND CURRENT_DATE + INTERVAL '30 days'
+    `;
+
+    const values = [];
+
+    if (year) {
+      query += ` AND EXTRACT(YEAR FROM amc_end_date) = $1`;
+      values.push(year);
+    }
+
+    query += ` ORDER BY amc_end_date`;
+
+    const result = await pool.query(query, values);
+    res.json(result.rows);
+
+  } catch (err) {
+    console.error("ENDING AMC ERROR:", err);
+    res.status(500).json({ error: err.message });
+  }
 });
 
 module.exports = router;

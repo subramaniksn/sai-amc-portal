@@ -13,7 +13,12 @@ import {
   TableBody,
   TableCell,
   TableHead,
-  TableRow
+  TableRow,
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem,
+  Alert
 } from "@mui/material";
 
 import {
@@ -36,18 +41,60 @@ export default function ManagerDashboard() {
   const [mwFilter, setMwFilter] = useState("");
   const [siteCountFilter, setSiteCountFilter] = useState("");
 
+  // ✅ NEW STATES
+  const [yearList, setYearList] = useState([]);
+  const [period, setPeriod] = useState("");
+  const [upcoming, setUpcoming] = useState([]);
+
+  // ===============================
+  // YEAR GENERATION
+  // ===============================
   useEffect(() => {
-    fetchSites();
+    const currentYear = new Date().getFullYear();
+
+    const years = [];
+    for (let i = currentYear - 2; i <= currentYear + 5; i++) {
+      years.push(`${i}-${i + 1}`);
+    }
+
+    setYearList(years);
+    setPeriod(`${currentYear}-${currentYear + 1}`);
   }, []);
 
-  const fetchSites = async () => {
+  // ===============================
+  // FETCH DATA
+  // ===============================
+  useEffect(() => {
+    if (!period) return;
+
+    const year = period.split("-")[0];
+
+    fetchSites(year);
+    fetchUpcoming(year);
+
+  }, [period]);
+
+  const fetchSites = async (year) => {
     try {
-      const res = await api.get("/amc");
+      const res = await api.get("/amc", { params: { year } });
       const data = res.data || [];
       setSites(data);
       setFilteredSites(data);
     } catch (err) {
       console.error("Failed to load sites:", err);
+    }
+  };
+
+  // ✅ AMC UPCOMING
+  const fetchUpcoming = async (year) => {
+    try {
+      const res = await api.get("/amc/upcoming", {
+        params: { year }
+      });
+
+      setUpcoming(res.data);
+    } catch (err) {
+      console.error("Upcoming AMC Error:", err);
     }
   };
 
@@ -155,7 +202,7 @@ export default function ManagerDashboard() {
     });
 
   };
- 
+
   const barColors = [
     "#ff9800",
     "#1976d2",
@@ -167,6 +214,33 @@ export default function ManagerDashboard() {
   return (
 
     <Container maxWidth="lg">
+
+      {/* ✅ YEAR SELECT */}
+      <Box sx={{ mb: 3, width: 250 }}>
+        <FormControl fullWidth size="small">
+          <InputLabel>Period</InputLabel>
+          <Select
+            value={period}
+            label="Period"
+            onChange={(e) => setPeriod(e.target.value)}
+          >
+            {yearList.map((y) => (
+              <MenuItem key={y} value={y}>{y}</MenuItem>
+            ))}
+          </Select>
+        </FormControl>
+      </Box>
+
+      {/* ✅ AMC ENDING ALERT */}
+      {upcoming.length > 0 && (
+        <Box sx={{ mb: 3 }}>
+          <Alert severity="error">
+            {upcoming.length} AMC(s) ending soon:{" "}
+            {upcoming.map((u) => u.plant_name).join(", ")}
+            {upcoming.length > 6 && "..."}
+          </Alert>
+        </Box>
+      )}
 
       {/* DASHBOARD CARDS */}
       <Grid container spacing={3} sx={{ mb: 4 }}>
@@ -298,15 +372,15 @@ export default function ManagerDashboard() {
               <TableHead>
                 <TableRow>
 
-                  <TableCell sx={{ minWidth: 120 }}>Plant Name</TableCell>
+                  <TableCell>Plant Name</TableCell>
                   <TableCell align="center">MW</TableCell>
-                  <TableCell sx={{ minWidth: 180 }}>Billing Address</TableCell>
-                  <TableCell sx={{ minWidth: 200 }}>Contact Person</TableCell>
+                  <TableCell>Billing Address</TableCell>
+                  <TableCell>Contact Person</TableCell>
                   <TableCell align="center">PO No</TableCell>
                   <TableCell align="center">AMC Start</TableCell>
                   <TableCell align="center">AMC End</TableCell>
                   <TableCell align="center">Billing Cycle</TableCell>
-                  <TableCell sx={{ minWidth: 200 }}>Supporting Document</TableCell>
+                  <TableCell>Supporting Document</TableCell>
                   <TableCell align="center">Site Visit</TableCell>
 
                 </TableRow>

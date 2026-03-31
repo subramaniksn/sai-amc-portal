@@ -72,75 +72,79 @@ router.get("/invoice-list/:type", verifyToken, async (req, res) => {
   try {
 
     const { type } = req.params;
+    const { year } = req.query;
+
     let query = "";
+    let values = [];
+
+    const yearFilter = year
+      ? ` AND EXTRACT(YEAR FROM i.due_date) = $1 `
+      : "";
 
     // ==============================
-    // DUE INVOICES
+    // DUE
     // ==============================
-
     if (type === "due") {
-
       query = `
-      SELECT
-        a.customer_name,
-        a.plant_name,
-        i.po_number,
-        i.period_number,
-        TO_CHAR(i.due_date,'YYYY-MM-DD') AS due_date,
-        CASE
-          WHEN i.due_date < CURRENT_DATE THEN 'OVERDUE'
-          WHEN i.due_date = CURRENT_DATE THEN 'DUE TODAY'
-          ELSE 'UPCOMING'
-        END AS invoice_status
-      FROM invoice_schedule i
-      JOIN amc_site_entry a ON a.id = i.amc_id
-      WHERE i.invoice_raised = false
-      AND i.payment_received = false
-      AND i.due_date <= CURRENT_DATE + INTERVAL '30 days'
-      ORDER BY i.due_date
+        SELECT
+          a.customer_name,
+          a.plant_name,
+          i.po_number,
+          i.period_number,
+          TO_CHAR(i.due_date,'YYYY-MM-DD') AS due_date,
+          CASE
+            WHEN i.due_date < CURRENT_DATE THEN 'OVERDUE'
+            WHEN i.due_date = CURRENT_DATE THEN 'DUE TODAY'
+            ELSE 'UPCOMING'
+          END AS invoice_status
+        FROM invoice_schedule i
+        JOIN amc_site_entry a ON a.id = i.amc_id
+        WHERE i.invoice_raised = false
+        AND i.payment_received = false
+        AND i.due_date <= CURRENT_DATE + INTERVAL '30 days'
+        ${yearFilter}
+        ORDER BY i.due_date
       `;
     }
 
     // ==============================
-    // PAYMENT PENDING
+    // PENDING
     // ==============================
-
     else if (type === "pending") {
-
       query = `
-      SELECT
-        a.customer_name,
-        a.plant_name,
-        i.po_number,
-        i.period_number,
-        TO_CHAR(i.due_date,'YYYY-MM-DD') AS due_date,
-        'Payment Pending' AS invoice_status
-      FROM invoice_schedule i
-      JOIN amc_site_entry a ON a.id = i.amc_id
-      WHERE i.invoice_raised = true
-      AND i.payment_received = false
-      ORDER BY i.due_date
+        SELECT
+          a.customer_name,
+          a.plant_name,
+          i.po_number,
+          i.period_number,
+          TO_CHAR(i.due_date,'YYYY-MM-DD') AS due_date,
+          'Payment Pending' AS invoice_status
+        FROM invoice_schedule i
+        JOIN amc_site_entry a ON a.id = i.amc_id
+        WHERE i.invoice_raised = true
+        AND i.payment_received = false
+        ${yearFilter}
+        ORDER BY i.due_date
       `;
     }
 
     // ==============================
-    // PAID INVOICES
+    // PAID
     // ==============================
-
     else if (type === "paid") {
-
       query = `
-      SELECT
-        a.customer_name,
-        a.plant_name,
-        i.po_number,
-        i.period_number,
-        TO_CHAR(i.due_date,'YYYY-MM-DD') AS due_date,
-        'Paid' AS invoice_status
-      FROM invoice_schedule i
-      JOIN amc_site_entry a ON a.id = i.amc_id
-      WHERE i.payment_received = true
-      ORDER BY i.due_date
+        SELECT
+          a.customer_name,
+          a.plant_name,
+          i.po_number,
+          i.period_number,
+          TO_CHAR(i.due_date,'YYYY-MM-DD') AS due_date,
+          'Paid' AS invoice_status
+        FROM invoice_schedule i
+        JOIN amc_site_entry a ON a.id = i.amc_id
+        WHERE i.payment_received = true
+        ${yearFilter}
+        ORDER BY i.due_date
       `;
     }
 
@@ -148,14 +152,14 @@ router.get("/invoice-list/:type", verifyToken, async (req, res) => {
       return res.status(400).json({ error: "Invalid invoice type" });
     }
 
-    const result = await pool.query(query);
+    if (year) values.push(year);
+
+    const result = await pool.query(query, values);
     res.json(result.rows);
 
   } catch (err) {
-
     console.error("INVOICE LIST ERROR:", err);
     res.status(500).json({ error: "Server error" });
-
   }
 });
 
@@ -165,28 +169,40 @@ router.get("/invoice-list/:type", verifyToken, async (req, res) => {
 // ==============================
 
 router.get("/invoice-summary", verifyToken, async (req, res) => {
-
   try {
 
-    const result = await pool.query(`
+    const { year } = req.query;
+
+    let query = `
       SELECT
         COUNT(*) FILTER (
-          WHERE invoice_raised = false
-          AND payment_received = false
-          AND due_date <= CURRENT_DATE + INTERVAL '30 days'
+          WHERE i.invoice_raised = false
+          AND i.payment_received = false
+          AND i.due_date <= CURRENT_DATE + INTERVAL '30 days'
         ) AS due,
 
         COUNT(*) FILTER (
-          WHERE invoice_raised = true
-          AND payment_received = false
+          WHERE i.invoice_raised = true
+          AND i.payment_received = false
         ) AS pending,
 
         COUNT(*) FILTER (
-          WHERE payment_received = true
+          WHERE i.payment_received = true
         ) AS paid
 
-      FROM invoice_schedule
-    `);
+      FROM invoice_schedule i
+      JOIN amc_site_entry a ON a.id = i.amc_id
+    `;
+
+    const values = [];
+
+    // ✅ APPLY YEAR FILTER
+    if (year) {
+      query += ` WHERE EXTRACT(YEAR FROM i.due_date) = $1 `;
+      values.push(year);
+    }
+
+    const result = await pool.query(query, values);
 
     res.json({
       due: Number(result.rows[0].due),
@@ -195,12 +211,9 @@ router.get("/invoice-summary", verifyToken, async (req, res) => {
     });
 
   } catch (err) {
-
     console.error("INVOICE SUMMARY ERROR:", err);
     res.status(500).json({ error: "Server error" });
-
   }
-
 });
 
 module.exports = router;
