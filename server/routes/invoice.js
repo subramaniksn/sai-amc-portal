@@ -78,7 +78,7 @@ router.get("/invoice-list/:type", verifyToken, async (req, res) => {
     let values = [];
 
     const yearFilter = year
-      ? ` AND EXTRACT(YEAR FROM i.due_date) = $1 `
+      ? ` AND EXTRACT(YEAR FROM a.amc_start_date) = $1 `
       : "";
 
     // ==============================
@@ -198,7 +198,7 @@ router.get("/invoice-summary", verifyToken, async (req, res) => {
 
     // ✅ APPLY YEAR FILTER
     if (year) {
-      query += ` WHERE EXTRACT(YEAR FROM i.due_date) = $1 `;
+      query += ` WHERE EXTRACT(YEAR FROM a.amc_start_date) = $1 `;
       values.push(year);
     }
 
