@@ -14,7 +14,14 @@ import {
   FormControl,
   InputLabel,
   Select,
-  MenuItem
+  MenuItem,
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableRow,
+  TableContainer,
+  Paper
 } from "@mui/material";
 import {
   BarChart,
@@ -269,6 +276,7 @@ export default function AdminDashboard() {
           </Typography>
           <ResponsiveContainer width="100%" height={300}>
             <BarChart data={chartData} margin={{ bottom: 80 }}>
+
               <XAxis
                 dataKey="customer_name"
                 tick={{ fontSize: 12 }}
@@ -276,9 +284,22 @@ export default function AdminDashboard() {
                 textAnchor="end"
                 interval={0}
               />
-              <YAxis />
-              <Tooltip />
+
+              <YAxis
+                width={100}
+                tickFormatter={(value) =>
+                  `₹ ${new Intl.NumberFormat("en-IN").format(value)}`
+                }
+              />
+
+              <Tooltip
+                formatter={(value) =>
+                  `₹ ${new Intl.NumberFormat("en-IN").format(value)}`
+                }
+              />
+
               <Bar dataKey="pending" fill="#ff9800" />
+              
             </BarChart>
           </ResponsiveContainer>
         </CardContent>
@@ -333,57 +354,107 @@ export default function AdminDashboard() {
         </Box>
       
       {/* AMC LIST */}
-      <Grid container spacing={3}>
-        {data.map((d) => {
+      <TableContainer component={Paper} sx={{ mt: 3, maxHeight: 500 }}>
+  <Table stickyHeader>
 
-          const payment = getPendingForPlant(d.plant_name);
+    {/* HEADER */}
+    <TableHead>
+      <TableRow>
+        {[
+          "Plant Name",
+          "Customer",
+          "Total Amount",
+          "Received",
+          "Pending",
+          "Status",
+          "Action"
+        ].map((head) => (
+          <TableCell
+            key={head}
+            sx={{
+              backgroundColor: "#1976d2 !important", // FORCE BLUE
+              color: "#fff !important",              // FORCE WHITE TEXT
+              fontWeight: "bold"
+            }}
+          >
+            {head}
+          </TableCell>
+        ))}
+      </TableRow>
+    </TableHead>
 
-          let status = "Pending";
-          let color = "error";
+    {/* BODY */}
+    <TableBody>
+          {data.map((d) => {
 
-          if (payment.pending === 0) {
-            status = "Paid";
-            color = "success";
-          } else if (payment.received > 0) {
-            status = "Partial";
-            color = "warning";
-          }
+            const payment = getPendingForPlant(d.plant_name);
 
-          return (
-            <Grid item xs={12} md={4} key={d.id}>
-              <Card elevation={3}>
-                <CardContent>
-                  <Typography variant="h6">{d.plant_name}</Typography>
+            const pendingVal = Number(payment?.pending || 0);
+            const receivedVal = Number(payment?.received || 0);
 
-                  <Typography>
-                    Pending: ₹ {formatCurrency(payment.pending)}
-                  </Typography>
+            let status = "Pending";
+            let rowColor = "#ffebee"; // red
 
-                  <Typography>
-                    Received: ₹ {formatCurrency(payment.received)}
-                  </Typography>
+            if (pendingVal <= 0) {
+              status = "Paid";
+              rowColor = "#e8f5e9"; // green
+            } else if (receivedVal > 0) {
+              status = "Partial";
+              rowColor = "#fff3e0"; // orange
+            }
 
-                  <Box sx={{ mt: 1 }}>
-                    <Chip label={status} color={color} size="small" />
-                  </Box>
+            return (
+              <TableRow key={d.id} sx={{ backgroundColor: rowColor }}>
 
-                  {role === "Admin" && (
+                <TableCell>{d.plant_name}</TableCell>
+
+                <TableCell>{d.customer_name}</TableCell>
+
+                <TableCell>
+                  ₹ {formatCurrency(d.total_amount_without_gst)}
+                </TableCell>
+
+                <TableCell>
+                  ₹ {formatCurrency(receivedVal)}
+                </TableCell>
+
+                <TableCell>
+                  ₹ {formatCurrency(pendingVal)}
+                </TableCell>
+
+                <TableCell>
+                  <Chip
+                    label={status}
+                    color={
+                      status === "Paid"
+                        ? "success"
+                        : status === "Partial"
+                        ? "warning"
+                        : "error"
+                    }
+                    size="small"
+                  />
+                </TableCell>
+
+                <TableCell>
+                  {role?.toLowerCase() === "admin" && (
                     <Button
-                      component={Link}
-                      to={`/edit/${d.id}`}
+                      variant="contained"
                       size="small"
-                      sx={{ mt: 1 }}
+                      onClick={() => navigate(`/edit/${d.id}`)}
                     >
                       Edit
                     </Button>
                   )}
+                </TableCell>
 
-                </CardContent>
-              </Card>
-            </Grid>
-          );
-        })}
-      </Grid>
+              </TableRow>
+            );
+          })}
+        </TableBody>
+
+      </Table>
+    </TableContainer>
 
     </Container>
   );
