@@ -392,46 +392,90 @@ router.get("/upcoming", verifyToken, async (req, res) => {
 // ========================================
 // EXPORT AMC DATA
 // ========================================
-router.get("/export", async (req, res) => {
 
+router.get("/export", verifyToken, async (req, res) => {
   try {
 
-    const result = await pool.query(`
+    const { year } = req.query;
+
+    let query = `
       SELECT
-        customer_name,
-        plant_name,
-        total_amount_without_gst,
-        balance_amount_without_gst
-      FROM amc_site_entry
-    `);
+        a.customer_name,
+        a.plant_name,
+        MAX(i.po_number) AS po_number,
+
+        TO_CHAR(a.amc_start_date, 'DD-MM-YYYY') AS amc_start_date,
+        TO_CHAR(a.amc_end_date, 'DD-MM-YYYY') AS amc_end_date,
+
+        SUM(i.invoice_amount) AS total_amount,
+
+        SUM(CASE 
+              WHEN i.payment_received = true 
+              THEN i.invoice_amount 
+              ELSE 0 
+            END) AS received_amount,
+
+        SUM(CASE 
+              WHEN i.payment_received = false 
+              THEN i.invoice_amount 
+              ELSE 0 
+            END) AS pending_amount
+
+      FROM amc_site_entry a
+      JOIN invoice_schedule i ON i.amc_id = a.id
+    `;
+
+    const values = [];
+
+    // ✅ YEAR FILTER
+    if (year) {
+      query += ` WHERE EXTRACT(YEAR FROM a.amc_start_date) = $1 `;
+      values.push(year);
+    }
+
+    query += `
+      GROUP BY
+        a.id,
+        a.customer_name,
+        a.plant_name,
+        a.amc_start_date,
+        a.amc_end_date
+      ORDER BY a.customer_name
+    `;
+
+    const result = await pool.query(query, values);
 
     const workbook = new ExcelJS.Workbook();
-    const sheet = workbook.addWorksheet("AMC Data");
+    const sheet = workbook.addWorksheet("AMC Report");
 
     sheet.columns = [
-      { header: "Customer", key: "customer_name", width: 25 },
-      { header: "Plant", key: "plant_name", width: 25 },
-      { header: "Total Amount", key: "total_amount_without_gst", width: 15 },
-      { header: "Balance", key: "balance_amount_without_gst", width: 15 }
+      { header: "Customer Name", key: "customer_name", width: 25 },
+      { header: "Plant Name", key: "plant_name", width: 25 },
+      { header: "PO Number", key: "po_number", width: 20 },
+      { header: "AMC Start Date", key: "amc_start_date", width: 18 },
+      { header: "AMC End Date", key: "amc_end_date", width: 18 },
+      { header: "Total Amount", key: "total_amount", width: 18 },
+      { header: "Received Amount", key: "received_amount", width: 18 },
+      { header: "Pending Amount", key: "pending_amount", width: 18 }
     ];
 
     sheet.addRows(result.rows);
 
+    sheet.getRow(1).font = { bold: true };
+
     res.set({
       "Content-Type":
         "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-      "Content-Disposition": "attachment; filename=amc-data.xlsx"
+      "Content-Disposition": `attachment; filename=amc-${year || "all"}.xlsx`
     });
 
     await workbook.xlsx.write(res);
     res.end();
 
   } catch (err) {
-
+    console.error("EXPORT ERROR:", err);
     res.status(500).json({ error: err.message });
-
   }
-
 });
 // ========================================
 // GET PENDING AMCs BY CUSTOMER

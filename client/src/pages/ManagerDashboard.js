@@ -202,6 +202,29 @@ export default function ManagerDashboard() {
     });
 
   };
+  const handleExport = async () => {
+    try {
+      const year = period.split("-")[0];
+
+      const response = await api.get(`/amc/export?year=${year}`, {
+        responseType: "blob"
+      });
+
+      const url = window.URL.createObjectURL(new Blob([response.data]));
+
+      const link = document.createElement("a");
+      link.href = url;
+      link.setAttribute("download", `AMC_Report_${year}.xlsx`);
+
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+
+    } catch (err) {
+      console.error("Export error:", err);
+      alert("Failed to export data");
+    }
+  };
 
   const barColors = [
     "#ff9800",
@@ -321,6 +344,13 @@ export default function ManagerDashboard() {
                 Clear
               </Button>
 
+              <Button
+                variant="contained"
+                color="success"
+                onClick={handleExport}
+              >
+                Export Excel
+              </Button>
             </Box>
           </Grid>
 

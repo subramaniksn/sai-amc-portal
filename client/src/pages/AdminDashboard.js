@@ -285,17 +285,52 @@ export default function AdminDashboard() {
       </Card>
 
       <Box sx={{ mb: 3 }}>
-        {role?.toLowerCase() === "admin" && (
-          <Button
-            variant="contained"
-            component={Link}
-            to="/add-amc"
-            sx={{ mr: 2 }}
-          >
-            Add AMC
-          </Button>
-        )}
-      </Box>
+
+          {role?.toLowerCase() === "admin" && (
+            <>
+              <Button
+                variant="contained"
+                component={Link}
+                to="/add-amc"
+                sx={{ mr: 2 }}
+              >
+                Add AMC
+              </Button>
+
+              <Button
+                variant="contained"
+                color="success"
+                sx={{ mr: 2 }}
+                onClick={async () => {
+                  try {
+                    const year = period.split("-")[0]; // from dropdown
+
+                    const res = await api.get(`/amc/export?year=${year}`, {
+                      responseType: "blob", // IMPORTANT
+                    });
+
+                    const url = window.URL.createObjectURL(new Blob([res.data]));
+                    const link = document.createElement("a");
+
+                    link.href = url;
+                    link.setAttribute("download", `AMC_Report_${year}.xlsx`);
+
+                    document.body.appendChild(link);
+                    link.click();
+                    link.remove();
+
+                  } catch (err) {
+                    console.error("Export error:", err);
+                    alert("Export failed");
+                  }
+                }}
+              >
+                Export AMC
+              </Button>
+            </>
+          )}
+
+        </Box>
       
       {/* AMC LIST */}
       <Grid container spacing={3}>
