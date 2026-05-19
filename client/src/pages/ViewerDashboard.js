@@ -291,7 +291,7 @@ export default function ViewerDashboard() {
 
         <Grid item xs={12} md={2}>
           <Card sx={{ p: 3, cursor: "pointer" }}
-            onClick={() => navigate("/invoice-list/due")}
+            onClick={() => navigate("/invoice-list/due", { state: { year: period.split("-")[0] } })}
           >
             <Typography variant="h6">Due</Typography>
             <Typography variant="h4" color="error">
@@ -302,7 +302,7 @@ export default function ViewerDashboard() {
 
         <Grid item xs={12} md={2}>
           <Card sx={{ p: 3, cursor: "pointer" }}
-            onClick={() => navigate("/invoice-list/pending")}
+            onClick={() => navigate("/invoice-list/pending", { state: { year: period.split("-")[0] } })}
           >
             <Typography variant="h6">Pending</Typography>
             <Typography variant="h4" color="warning.main">
@@ -313,7 +313,7 @@ export default function ViewerDashboard() {
 
         <Grid item xs={12} md={2}>
           <Card sx={{ p: 3, cursor: "pointer" }}
-            onClick={() => navigate("/invoice-list/paid")}
+            onClick={() => navigate("/invoice-list/paid", { state: { year: period.split("-")[0] } })}
           >
             <Typography variant="h6">Paid</Typography>
             <Typography variant="h4" color="success.main">

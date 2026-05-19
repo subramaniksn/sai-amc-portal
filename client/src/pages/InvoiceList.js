@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useParams } from "react-router-dom";
+import { useParams, useLocation } from "react-router-dom";
 import api from "../api";
 
 import {
@@ -18,6 +18,8 @@ import {
 
 export default function InvoiceList() {
   const { type } = useParams();
+  const location = useLocation();
+  const year = location.state?.year || new Date().getFullYear();
 
   const [data, setData] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -38,7 +40,7 @@ export default function InvoiceList() {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const res = await api.get(`/invoice/invoice-list/${type}`);
+        const res = await api.get(`/invoice/invoice-list/${type}`, { params: { year } });
         setData(res.data);
       } catch (err) {
         console.error("Failed to fetch invoices:", err);
@@ -48,7 +50,7 @@ export default function InvoiceList() {
     };
 
     fetchData();
-  }, [type]);
+  }, [type, year]);
 
   // =========================
   // ROW COLOR LOGIC

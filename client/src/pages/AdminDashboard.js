@@ -234,7 +234,7 @@ export default function AdminDashboard() {
       <Grid container spacing={3} sx={{ mb: 4 }}>
 
         <Grid item xs={12} md={4}>
-          <Card sx={{ cursor: "pointer" }} onClick={() => navigate("/invoice-list/due")}>
+          <Card sx={{ cursor: "pointer" }} onClick={() => navigate("/invoice-list/due", { state: { year: period.split("-")[0] } })}>
             <CardContent>
               <Typography variant="h6">Due Invoices</Typography>
               <Typography variant="h4" color="error">
@@ -245,7 +245,7 @@ export default function AdminDashboard() {
         </Grid>
 
         <Grid item xs={12} md={4}>
-          <Card sx={{ cursor: "pointer" }} onClick={() => navigate("/invoice-list/pending")}>
+          <Card sx={{ cursor: "pointer" }} onClick={() => navigate("/invoice-list/pending", { state: { year: period.split("-")[0] } })}>
             <CardContent>
               <Typography variant="h6">Pending Payment</Typography>
               <Typography variant="h4" color="warning.main">
@@ -256,7 +256,7 @@ export default function AdminDashboard() {
         </Grid>
 
         <Grid item xs={12} md={4}>
-          <Card sx={{ cursor: "pointer" }} onClick={() => navigate("/invoice-list/paid")}>
+          <Card sx={{ cursor: "pointer" }} onClick={() => navigate("/invoice-list/paid", { state: { year: period.split("-")[0] } })}>
             <CardContent>
               <Typography variant="h6">Paid Invoices</Typography>
               <Typography variant="h4" color="success.main">
