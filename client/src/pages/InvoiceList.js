@@ -19,7 +19,8 @@ import {
 export default function InvoiceList() {
   const { type } = useParams();
   const location = useLocation();
-  const year = location.state?.year || new Date().getFullYear();
+  const year = location.state?.year || "";
+  const status = location.state?.status || "";  // ✅ read status from navigate state
 
   const [data, setData] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -40,7 +41,12 @@ export default function InvoiceList() {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const res = await api.get(`/invoice/invoice-list/${type}`, { params: { year } });
+        const res = await api.get(`/invoice/invoice-list/${type}`, {
+          params: {
+            year: year || undefined,
+            status: status || undefined   // ✅ pass status to backend
+          }
+        });
         setData(res.data);
       } catch (err) {
         console.error("Failed to fetch invoices:", err);
@@ -50,29 +56,39 @@ export default function InvoiceList() {
     };
 
     fetchData();
-  }, [type, year]);
+  }, [type, year, status]);  // ✅ status in dependency array
 
   // =========================
   // ROW COLOR LOGIC
   // =========================
   const getRowColor = (status) => {
     if (!status) return "#ffffff";
-
     const s = status.toLowerCase();
-
-    if (s === "overdue" || s === "payment pending") return "#ffebee"; // red
-    if (s === "upcoming") return "#fff3e0"; // orange
-    if (s === "paid") return "#e8f5e9"; // green
-
+    if (s === "overdue" || s === "payment pending") return "#ffebee";
+    if (s === "upcoming") return "#fff3e0";
+    if (s === "due today") return "#fff8e1";
+    if (s === "paid") return "#e8f5e9";
     return "#ffffff";
   };
+
+  // =========================
+  // TITLE LABEL
+  // =========================
+  const statusLabel =
+    status === "live"      ? "🟢 Live" :
+    status === "completed" ? "🔴 Completed" : "📋 All";
 
   return (
     <Container maxWidth="lg">
 
       {/* TITLE */}
-      <Typography variant="h4" gutterBottom sx={{ mb: 3 }}>
+      <Typography variant="h4" gutterBottom sx={{ mb: 1 }}>
         {type?.toUpperCase()} Invoices
+      </Typography>
+
+      {/* SUBTITLE — shows which filter is active */}
+      <Typography variant="subtitle1" color="text.secondary" sx={{ mb: 3 }}>
+        {statusLabel} {year ? `· ${year}-${Number(year)+1}` : "· All Years"}
       </Typography>
 
       {/* LOADING */}
@@ -93,11 +109,9 @@ export default function InvoiceList() {
           component={Paper}
           elevation={5}
           sx={{
-            maxHeight: 700, 
+            maxHeight: 700,
             overflow: "auto",
-            "&::-webkit-scrollbar": {
-              width: "12px"
-            },
+            "&::-webkit-scrollbar": { width: "12px" },
             "&::-webkit-scrollbar-thumb": {
               backgroundColor: "#888",
               borderRadius: "4px"

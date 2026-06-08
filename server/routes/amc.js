@@ -113,31 +113,22 @@ router.post("/", verifyToken, async (req, res) => {
       const cycle = billing_cycle.toLowerCase();
 
       if (cycle.includes("month")) {
-
         schedule = generateInvoiceSchedule(amc_start_date, amc_end_date, invoice_raise_timing, 1);
-
       } 
       else if (cycle.includes("quarter")) {
-
         schedule = generateInvoiceSchedule(amc_start_date, amc_end_date, invoice_raise_timing, 3);
-
       } 
       else if (cycle.includes("half")) {
-
         schedule = generateInvoiceSchedule(amc_start_date, amc_end_date, invoice_raise_timing, 6);
-
       } 
       else if (cycle.includes("year")) {
-
         schedule = generateInvoiceSchedule(amc_start_date, amc_end_date, invoice_raise_timing, 12);
-
       }
 
       const amountPerPeriod =
         schedule.length > 0 ? totalAmount / schedule.length : 0;
 
       for (const s of schedule) {
-
         await pool.query(`
           INSERT INTO invoice_schedule (
             amc_id,
@@ -156,7 +147,6 @@ router.post("/", verifyToken, async (req, res) => {
           amountPerPeriod,
           amountPerPeriod
         ]);
-
       }
 
     }
@@ -164,10 +154,8 @@ router.post("/", verifyToken, async (req, res) => {
     res.json(amc.rows[0]);
 
   } catch (err) {
-
     console.error("CREATE AMC ERROR:", err);
     res.status(500).json({ error: err.message });
-
   }
 
 });
@@ -178,8 +166,7 @@ router.post("/", verifyToken, async (req, res) => {
 // ========================================
 router.get("/", async (req, res) => {
   try {
-
-    const { year } = req.query;
+    const { year, status } = req.query;
 
     let query = `
       SELECT 
@@ -187,25 +174,30 @@ router.get("/", async (req, res) => {
         MAX(i.po_number) AS po_number,
         MAX(i.invoice_date) AS po_date
       FROM amc_site_entry a
-      LEFT JOIN invoice_schedule i
-      ON a.id = i.amc_id
+      LEFT JOIN invoice_schedule i ON a.id = i.amc_id
     `;
 
+    const conditions = [];
     const values = [];
 
-    // ✅ APPLY FILTER ONLY IF YEAR PASSED
     if (year) {
-      query += ` WHERE EXTRACT(YEAR FROM a.amc_start_date) = $1 `;
       values.push(year);
+      conditions.push(`EXTRACT(YEAR FROM a.amc_start_date) = $${values.length}`);
     }
 
-    query += `
-      GROUP BY a.id
-      ORDER BY a.id
-    `;
+    if (status === "live") {
+      conditions.push(`a.amc_end_date >= CURRENT_DATE`);
+    } else if (status === "completed") {
+      conditions.push(`a.amc_end_date < CURRENT_DATE`);
+    }
+
+    if (conditions.length > 0) {
+      query += ` WHERE ` + conditions.join(" AND ");
+    }
+
+    query += ` GROUP BY a.id ORDER BY a.id`;
 
     const result = await pool.query(query, values);
-
     res.json(result.rows);
 
   } catch (err) {
@@ -241,9 +233,7 @@ router.get("/schedule/:amcId", verifyToken, async (req, res) => {
     res.json(result.rows);
 
   } catch (err) {
-
     res.status(500).json({ error: err.message });
-
   }
 
 });
@@ -270,9 +260,7 @@ router.put("/raise/:scheduleId", verifyToken, async (req, res) => {
     res.json({ message: "Invoice raised successfully" });
 
   } catch (err) {
-
     res.status(500).json({ error: err.message });
-
   }
 
 });
@@ -317,12 +305,11 @@ router.put("/receive/:scheduleId", verifyToken, async (req, res) => {
     res.json({ message: "Payment received successfully" });
 
   } catch (err) {
-
     res.status(500).json({ error: err.message });
-
   }
 
 });
+
 
 // ========================================
 // DASHBOARD
@@ -342,17 +329,15 @@ router.get("/dashboard", verifyToken, async (req, res) => {
     res.json(stats.rows[0]);
 
   } catch (err) {
-
     res.status(500).json({ error: err.message });
-
   }
 
 });
 
+
 // ========================================
 // UPCOMING AMCs
 // ========================================
-
 router.get("/upcoming", verifyToken, async (req, res) => {
   try {
 
@@ -371,7 +356,6 @@ router.get("/upcoming", verifyToken, async (req, res) => {
 
     const values = [];
 
-    // ✅ APPLY YEAR FILTER (based on AMC start year)
     if (year) {
       query += ` AND EXTRACT(YEAR FROM amc_start_date) = $1 `;
       values.push(year);
@@ -380,7 +364,6 @@ router.get("/upcoming", verifyToken, async (req, res) => {
     query += ` ORDER BY amc_end_date`;
 
     const result = await pool.query(query, values);
-
     res.json(result.rows);
 
   } catch (err) {
@@ -389,48 +372,53 @@ router.get("/upcoming", verifyToken, async (req, res) => {
   }
 });
 
+
 // ========================================
 // EXPORT AMC DATA
 // ========================================
-
 router.get("/export", verifyToken, async (req, res) => {
   try {
 
-    const { year } = req.query;
+    const { year, status } = req.query;
 
     let query = `
       SELECT
         a.customer_name,
         a.plant_name,
         MAX(i.po_number) AS po_number,
-
         TO_CHAR(a.amc_start_date, 'DD-MM-YYYY') AS amc_start_date,
         TO_CHAR(a.amc_end_date, 'DD-MM-YYYY') AS amc_end_date,
-
         SUM(i.invoice_amount) AS total_amount,
-
         SUM(CASE 
               WHEN i.payment_received = true 
               THEN i.invoice_amount 
               ELSE 0 
             END) AS received_amount,
-
         SUM(CASE 
               WHEN i.payment_received = false 
               THEN i.invoice_amount 
               ELSE 0 
             END) AS pending_amount
-
       FROM amc_site_entry a
       JOIN invoice_schedule i ON i.amc_id = a.id
     `;
 
+    const conditions = [];
     const values = [];
 
-    // ✅ YEAR FILTER
     if (year) {
-      query += ` WHERE EXTRACT(YEAR FROM a.amc_start_date) = $1 `;
       values.push(year);
+      conditions.push(`EXTRACT(YEAR FROM a.amc_start_date) = $${values.length}`);
+    }
+
+    if (status === "live") {
+      conditions.push(`a.amc_end_date >= CURRENT_DATE`);
+    } else if (status === "completed") {
+      conditions.push(`a.amc_end_date < CURRENT_DATE`);
+    }
+
+    if (conditions.length > 0) {
+      query += ` WHERE ` + conditions.join(" AND ");
     }
 
     query += `
@@ -449,23 +437,21 @@ router.get("/export", verifyToken, async (req, res) => {
     const sheet = workbook.addWorksheet("AMC Report");
 
     sheet.columns = [
-      { header: "Customer Name", key: "customer_name", width: 25 },
-      { header: "Plant Name", key: "plant_name", width: 25 },
-      { header: "PO Number", key: "po_number", width: 20 },
-      { header: "AMC Start Date", key: "amc_start_date", width: 18 },
-      { header: "AMC End Date", key: "amc_end_date", width: 18 },
-      { header: "Total Amount", key: "total_amount", width: 18 },
+      { header: "Customer Name",   key: "customer_name",   width: 25 },
+      { header: "Plant Name",      key: "plant_name",      width: 25 },
+      { header: "PO Number",       key: "po_number",       width: 20 },
+      { header: "AMC Start Date",  key: "amc_start_date",  width: 18 },
+      { header: "AMC End Date",    key: "amc_end_date",    width: 18 },
+      { header: "Total Amount",    key: "total_amount",    width: 18 },
       { header: "Received Amount", key: "received_amount", width: 18 },
-      { header: "Pending Amount", key: "pending_amount", width: 18 }
+      { header: "Pending Amount",  key: "pending_amount",  width: 18 }
     ];
 
     sheet.addRows(result.rows);
-
     sheet.getRow(1).font = { bold: true };
 
     res.set({
-      "Content-Type":
-        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      "Content-Type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
       "Content-Disposition": `attachment; filename=amc-${year || "all"}.xlsx`
     });
 
@@ -477,39 +463,47 @@ router.get("/export", verifyToken, async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 });
+
+
 // ========================================
 // GET PENDING AMCs BY CUSTOMER
 // ========================================
 router.get("/pending-by-customer", verifyToken, async (req, res) => {
   try {
-
-    const { year } = req.query;
+    const { year, status } = req.query;  // ✅ status added
 
     let query = `
       SELECT
         a.customer_name,
         a.plant_name,
         a.total_amount_without_gst,
-
         COALESCE(SUM(
           CASE WHEN i.payment_received = true THEN i.amount ELSE 0 END
         ),0) AS received_amount,
-
         a.total_amount_without_gst -
         COALESCE(SUM(
           CASE WHEN i.payment_received = true THEN i.amount ELSE 0 END
         ),0) AS pending_amount
-
       FROM amc_site_entry a
-      LEFT JOIN invoice_schedule i
-      ON a.id = i.amc_id
+      LEFT JOIN invoice_schedule i ON a.id = i.amc_id
     `;
 
+    const conditions = [];
     const values = [];
 
     if (year) {
-      query += ` WHERE EXTRACT(YEAR FROM a.amc_start_date) = $1 `;
       values.push(year);
+      conditions.push(`EXTRACT(YEAR FROM a.amc_start_date) = $${values.length}`);
+    }
+
+    if (status === "live") {
+      conditions.push(`a.amc_end_date >= CURRENT_DATE`);
+    } else if (status === "completed") {
+      conditions.push(`a.amc_end_date < CURRENT_DATE`);
+    }
+
+    if (conditions.length > 0) {
+      query += ` WHERE ` + conditions.join(" AND ");
     }
 
     query += `
@@ -518,7 +512,6 @@ router.get("/pending-by-customer", verifyToken, async (req, res) => {
     `;
 
     const result = await pool.query(query, values);
-
     res.json(result.rows);
 
   } catch (err) {
@@ -526,6 +519,8 @@ router.get("/pending-by-customer", verifyToken, async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 });
+
+
 // ========================================
 // GET SINGLE AMC
 // ========================================
@@ -546,14 +541,16 @@ router.get("/:id", verifyToken, async (req, res) => {
     res.json(result.rows[0]);
 
   } catch (err) {
-
     console.error("GET AMC ERROR:", err);
     res.status(500).json({ error: err.message });
-
   }
 
 });
 
+
+// ========================================
+// ENDING SOON
+// ========================================
 router.get("/ending-soon", verifyToken, async (req, res) => {
   try {
     const { year } = req.query;
@@ -582,5 +579,6 @@ router.get("/ending-soon", verifyToken, async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 });
+
 
 module.exports = router;

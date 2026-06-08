@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import api from "../api";
 import { Link, useNavigate } from "react-router-dom";
 import {
@@ -33,7 +33,7 @@ import {
 } from "recharts";
 
 export default function AdminDashboard() {
-
+  const [amcStatus, setAmcStatus] = useState("live"); // default: Live
   const [data, setData] = useState([]);
   const [upcoming, setUpcoming] = useState([]);
   const [pendingCustomer, setPendingCustomer] = useState([]);
@@ -68,51 +68,52 @@ export default function AdminDashboard() {
   // ===============================
   // FETCH DATA
   // ===============================
-  useEffect(() => {
-    if (!period) return;
-
-    const year = period.split("-")[0];
-
-    fetchData(year);
-    fetchInvoiceSummary(year);
-    fetchPendingCustomer(year);
-
-  }, [period]);
-
-  const fetchData = async (year) => {
+  // Wrap fetchData
+  const fetchData = useCallback(async (year) => {
     try {
-      const res = await api.get("/amc", { params: { year } });
+      const res = await api.get("/amc", {
+        params: { year: year || undefined, status: amcStatus }
+      });
       setData(res.data);
-
       const upcomingRes = await api.get("/amc/upcoming", { params: { year } });
       setUpcoming(upcomingRes.data);
-
     } catch (err) {
       console.error("Fetch Data Error:", err);
     }
-  };
+  }, [amcStatus]);
 
-  const fetchPendingCustomer = async (year) => {
+  // Wrap fetchPendingCustomer
+  const fetchPendingCustomer = useCallback(async (year) => {
     try {
       const res = await api.get("/amc/pending-by-customer", {
-        params: { year }
+        params: { year: year || undefined, status: amcStatus }
       });
       setPendingCustomer(res.data);
     } catch (err) {
       console.error("Pending Customer Error:", err);
     }
-  };
+  }, [amcStatus]);
 
-  const fetchInvoiceSummary = async (year) => {
+  // Wrap fetchInvoiceSummary
+  const fetchInvoiceSummary = useCallback(async (year) => {
     try {
       const res = await api.get("/invoice/invoice-summary", {
-        params: { year }
+        params: { year: year || undefined, status: amcStatus }
       });
       setInvoiceSummary(res.data);
     } catch (err) {
       console.error("Invoice Summary Error:", err);
     }
-  };
+  }, [amcStatus]);
+
+  // Update useEffect
+  useEffect(() => {
+    if (period === undefined) return;
+    const year = period === "all" ? "" : period.split("-")[0];
+    fetchData(year);
+    fetchInvoiceSummary(year);
+    fetchPendingCustomer(year);
+  }, [period, amcStatus, fetchData, fetchInvoiceSummary, fetchPendingCustomer]);
 
   // ===============================
   // CALCULATIONS
@@ -158,10 +159,10 @@ export default function AdminDashboard() {
     <Container maxWidth="xl">
 
       <Typography variant="h4" gutterBottom>
-        AMC Dashboard ({period})
+        AMC Dashboard — {amcStatus === "live" ? "🟢 Live" : amcStatus === "completed" ? "🔴 Completed" : "📋 All"} ({period === "all" ? "All Years" : period})
       </Typography>
 
-      {/* YEAR FILTER */}
+      {/* YEAR FILTER — keep as is */}
       <Box sx={{ mb: 3, width: 250 }}>
         <FormControl fullWidth size="small">
           <InputLabel>Period</InputLabel>
@@ -175,6 +176,31 @@ export default function AdminDashboard() {
             ))}
           </Select>
         </FormControl>
+      </Box>
+
+      {/* ADD THIS right after the year filter, before the AMC ENDING ALERT */}
+      <Box sx={{ mb: 3, display: "flex", gap: 2, alignItems: "center" }}>
+        <Button
+          variant={amcStatus === "live" ? "contained" : "outlined"}
+          color="success"
+          onClick={() => setAmcStatus("live")}
+        >
+          🟢 Live AMC
+        </Button>
+        <Button
+          variant={amcStatus === "completed" ? "contained" : "outlined"}
+          color="error"
+          onClick={() => setAmcStatus("completed")}
+        >
+          🔴 Completed AMC
+        </Button>
+        <Button
+          variant={amcStatus === "all" ? "contained" : "outlined"}
+          color="inherit"
+          onClick={() => setAmcStatus("all")}
+        >
+          📋 All
+        </Button>
       </Box>
 
       {/* AMC ENDING ALERT */}
