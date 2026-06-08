@@ -9,25 +9,27 @@ async function sendWhatsApp(number, message) {
   try {
     if (!whatsapp.isReady()) {
       console.log("⚠️ WhatsApp not ready");
-      return;
+      return false;
     }
 
     const sock = whatsapp.getSock();
 
     if (!sock) {
       console.log("⚠️ WhatsApp socket unavailable");
-      return;
+      return false;
     }
 
     const jid = `${number}@s.whatsapp.net`;
 
     await sock.sendMessage(jid, {
-      text: message
+      text: message,
     });
 
     console.log(`✅ WhatsApp sent to ${number}`);
+    return true;
   } catch (err) {
     console.error("WHATSAPP SEND ERROR:", err.message);
+    return false;
   }
 }
 
@@ -47,7 +49,9 @@ async function getUserPhonesByIds(ids) {
       [ids]
     );
 
-    return result.rows.map(r => r.phone);
+    return result.rows.map((r) =>
+      r.phone.replace(/\D/g, "")
+    );
   } catch (err) {
     console.error("PHONE FETCH ERROR:", err);
     return [];
@@ -61,19 +65,18 @@ async function getUserPhonesByIds(ids) {
 // PRODUCTION = 0 9 * * *
 // ======================================
 
-cron.schedule("* * * * *", async () => {
+cron.schedule("0 10 * * *", async () => {
   console.log("Running WhatsApp Invoice Cron...");
 
   try {
 
     // ====================================================
     // 1. INVOICE RAISE ALERT
-    // SEND TO USER ID = 5 (Accounts)
     // ====================================================
 
     const invoiceUsers = await getUserPhonesByIds([5]);
 
-    const upcoming = await pool.query(`
+    const upcomingInvoices = await pool.query(`
       SELECT
         s.*,
         a.customer_name,
@@ -86,36 +89,43 @@ cron.schedule("* * * * *", async () => {
       AND s.notification_sent = FALSE
     `);
 
-    for (const row of upcoming.rows) {
+    for (const row of upcomingInvoices.rows) {
 
       const msg =
 `🚨 *Invoice Raise Alert*
 
 Customer: ${row.customer_name}
 Plant: ${row.plant_name}
-PO Number: ${row.po_number || "Not Generated"}
+PO Number: ${row.po_number || "Not Available"}
 Quarter: ${row.period_number}
-Due Date: ${row.due_date}
+Due Date: ${new Date(row.due_date).toLocaleDateString("en-IN")}
 
 Please raise the invoice.`;
 
+      let sent = false;
+
       for (const phone of invoiceUsers) {
-        await sendWhatsApp(phone, msg);
+        const result = await sendWhatsApp(phone, msg);
+
+        if (result) {
+          sent = true;
+        }
       }
 
-      await pool.query(
-        `
-        UPDATE invoice_schedule
-        SET notification_sent = TRUE
-        WHERE id = $1
-        `,
-        [row.id]
-      );
+      if (sent) {
+        await pool.query(
+          `
+          UPDATE invoice_schedule
+          SET notification_sent = TRUE
+          WHERE id = $1
+          `,
+          [row.id]
+        );
+      }
     }
 
     // ====================================================
     // 2. PAYMENT REMINDER
-    // SEND TO USER ID = 5 (Accounts)
     // ====================================================
 
     const paymentReminder = await pool.query(`
@@ -126,8 +136,9 @@ Please raise the invoice.`;
       FROM invoice_schedule s
       JOIN amc_site_entry a
       ON a.id = s.amc_id
-      WHERE s.due_date = CURRENT_DATE - INTERVAL '20 days'
+      WHERE s.due_date <= CURRENT_DATE - INTERVAL '20 days'
       AND s.payment_received = FALSE
+      AND s.payment_notification_sent = FALSE
     `);
 
     for (const row of paymentReminder.rows) {
@@ -137,67 +148,84 @@ Please raise the invoice.`;
 
 Customer: ${row.customer_name}
 Plant: ${row.plant_name}
-PO Number: ${row.po_number || "Not Generated"}
+Invoice No: ${row.invoice_number || "Not Available"}
+PO Number: ${row.po_number || "Not Available"}
 Quarter: ${row.period_number}
-Due Date: ${row.due_date}
 
-Payment is pending for more than 20 days.`;
+Payment pending for more than 20 days.
+
+Please follow up with customer.`;
+
+      let sent = false;
 
       for (const phone of invoiceUsers) {
-        await sendWhatsApp(phone, msg);
+        const result = await sendWhatsApp(phone, msg);
+
+        if (result) {
+          sent = true;
+        }
+      }
+
+      if (sent) {
+        await pool.query(
+          `
+          UPDATE invoice_schedule
+          SET payment_notification_sent = TRUE
+          WHERE id = $1
+          `,
+          [row.id]
+        );
       }
     }
 
     // ====================================================
-    // 3. AMC EXPIRY ALERT
-    // SEND TO USER ID = 4 & 6
+    // 3. AMC RENEWAL ALERT
     // ====================================================
 
     const managerUsers = await getUserPhonesByIds([4, 6]);
 
-    const now = new Date();
-
-    const firstDay = new Date(
-      now.getFullYear(),
-      now.getMonth(),
-      1
-    );
-
-    const lastDay = new Date(
-      now.getFullYear(),
-      now.getMonth() + 1,
-      0
-    );
-
-    const endingAmc = await pool.query(
-      `
+    const endingAmc = await pool.query(`
       SELECT
+        id,
         customer_name,
         plant_name,
         amc_end_date
       FROM amc_site_entry
-      WHERE amc_end_date BETWEEN $1 AND $2
-      `,
-      [firstDay, lastDay]
-    );
+      WHERE amc_end_date >= CURRENT_DATE
+      AND amc_end_date <= CURRENT_DATE + INTERVAL '30 days'
+      AND renewal_notification_sent = FALSE
+    `);
 
-    if (endingAmc.rows.length > 0) {
+    for (const row of endingAmc.rows) {
 
-      let msg = "⚠️ *AMCs Ending This Month*\n\n";
+      const msg =
+`⚠️ *AMC Renewal Alert*
 
-      endingAmc.rows.forEach(row => {
-        msg +=
-`${row.customer_name}
-${row.plant_name}
-End Date: ${new Date(row.amc_end_date).toLocaleDateString("en-IN")}
+Customer: ${row.customer_name}
+Plant: ${row.plant_name}
+AMC End Date: ${new Date(row.amc_end_date).toLocaleDateString("en-IN")}
 
-`;
-      });
+Please initiate AMC renewal process.`;
 
-      msg += "\nPlease initiate AMC renewal process.";
+      let sent = false;
 
       for (const phone of managerUsers) {
-        await sendWhatsApp(phone, msg);
+        const result = await sendWhatsApp(phone, msg);
+
+        if (result) {
+          sent = true;
+        }
+      }
+
+      if (sent) {
+        await pool.query(
+          `
+          UPDATE amc_site_entry
+          SET renewal_notification_sent = TRUE
+          WHERE id = $1
+          `,
+          [row.id]
+        );
       }
     }
 
@@ -205,3 +233,5 @@ End Date: ${new Date(row.amc_end_date).toLocaleDateString("en-IN")}
     console.error("CRON ERROR:", err);
   }
 });
+
+module.exports = {};

@@ -253,7 +253,8 @@ router.put("/raise/:scheduleId", verifyToken, async (req, res) => {
       SET
         invoice_raised = TRUE,
         invoice_number = $1,
-        invoice_date = $2
+        invoice_date = $2,
+        notification_sent = TRUE
       WHERE id = $3
     `, [invoice_number, invoice_date, req.params.scheduleId]);
 
@@ -291,7 +292,8 @@ router.put("/receive/:scheduleId", verifyToken, async (req, res) => {
       UPDATE invoice_schedule
       SET
         payment_received = TRUE,
-        payment_date = CURRENT_DATE
+        payment_date = CURRENT_DATE,
+        payment_notification_sent = TRUE
       WHERE id = $1
     `, [scheduleId]);
 
@@ -320,9 +322,19 @@ router.get("/dashboard", verifyToken, async (req, res) => {
 
     const stats = await pool.query(`
       SELECT
-        COUNT(*) FILTER (WHERE invoice_raised=false) AS invoices_pending,
-        COUNT(*) FILTER (WHERE invoice_raised=true AND payment_received=false) AS payment_pending,
-        COUNT(*) FILTER (WHERE payment_received=true) AS paid_invoices
+      COUNT(*) FILTER (
+        WHERE invoice_raised = false
+        AND due_date <= CURRENT_DATE
+      ) AS invoices_pending,
+
+      COUNT(*) FILTER (
+        WHERE invoice_raised = true
+        AND payment_received = false
+      ) AS payment_pending,
+
+      COUNT(*) FILTER (
+        WHERE payment_received = true
+      ) AS paid_invoices
       FROM invoice_schedule
     `);
 
