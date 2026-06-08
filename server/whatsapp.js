@@ -36,19 +36,7 @@ async function connectToWhatsApp() {
         isWhatsAppReady = true;
 
         console.log("✅ WhatsApp CONNECTED & READY ✅");
-
-        try {
-          await sock.sendMessage(
-            "919945712362@s.whatsapp.net",
-            {
-              text: "✅ AMC Portal WhatsApp Connected Successfully"
-            }
-          );
-
-          console.log("✅ Test WhatsApp message sent");
-        } catch (err) {
-          console.error("Test message failed:", err.message);
-        }
+        
       }
 
       if (connection === "close") {
