@@ -1,148 +1,202 @@
 const cron = require("node-cron");
 const pool = require("../db");
+const whatsapp = require("../whatsapp");
 
 // ==============================
-// WHATSAPP SOCKET IMPORT
-// ==============================
-const { sock, isWhatsAppReady } = require("../whatsapp");
-
-// ==============================
-// SEND WHATSAPP HELPER
+// SEND WHATSAPP
 // ==============================
 async function sendWhatsApp(number, message) {
   try {
-    if (!isWhatsAppReady) {
+    if (!whatsapp.isReady()) {
       console.log("⚠️ WhatsApp not ready");
       return;
     }
 
-    const jid = number.includes("@s.whatsapp.net")
-      ? number
-      : `${number}@s.whatsapp.net`;
+    const sock = whatsapp.getSock();
 
-    await sock.sendMessage(jid, { text: message });
+    if (!sock) {
+      console.log("⚠️ WhatsApp socket unavailable");
+      return;
+    }
 
-    console.log("✅ WhatsApp sent to:", number);
+    const jid = `${number}@s.whatsapp.net`;
+
+    await sock.sendMessage(jid, {
+      text: message
+    });
+
+    console.log(`✅ WhatsApp sent to ${number}`);
   } catch (err) {
     console.error("WHATSAPP SEND ERROR:", err.message);
   }
 }
 
 // ==============================
-// GET USERS BY IDS
+// GET USER PHONES
 // ==============================
-const getUserPhonesByIds = async (ids) => {
-  const result = await pool.query(
-    `SELECT phone FROM users WHERE id = ANY($1) AND phone IS NOT NULL`,
-    [ids]
-  );
+async function getUserPhonesByIds(ids) {
+  try {
+    const result = await pool.query(
+      `
+      SELECT phone
+      FROM users
+      WHERE id = ANY($1)
+      AND phone IS NOT NULL
+      AND phone <> ''
+      `,
+      [ids]
+    );
 
-  return result.rows.map(r => r.phone);
-};
+    return result.rows.map(r => r.phone);
+  } catch (err) {
+    console.error("PHONE FETCH ERROR:", err);
+    return [];
+  }
+}
 
 // ======================================
-// CRON (EVERY MINUTE - TEST MODE)
+// CRON
 // ======================================
+// TEST MODE = EVERY MINUTE
+// PRODUCTION = 0 9 * * *
+// ======================================
+
 cron.schedule("* * * * *", async () => {
   console.log("Running WhatsApp Invoice Cron...");
 
   try {
 
-    // ==============================
-    // 1️⃣ INVOICE ALERT (3 DAYS BEFORE DUE)
-    // SENT TO ID 5 (ACCOUNTS)
-    // ==============================
+    // ====================================================
+    // 1. INVOICE RAISE ALERT
+    // SEND TO USER ID = 5 (Accounts)
+    // ====================================================
+
+    const invoiceUsers = await getUserPhonesByIds([5]);
+
     const upcoming = await pool.query(`
-      SELECT s.*, a.customer_name, a.plant_name
+      SELECT
+        s.*,
+        a.customer_name,
+        a.plant_name
       FROM invoice_schedule s
-      JOIN amc_site_entry a ON s.amc_id = a.id
+      JOIN amc_site_entry a
+      ON a.id = s.amc_id
       WHERE s.due_date = CURRENT_DATE + INTERVAL '3 days'
       AND s.invoice_number IS NULL
       AND s.notification_sent = FALSE
     `);
 
-    const accountsPhones = await getUserPhonesByIds([5]);
+    for (const row of upcoming.rows) {
 
-    for (let row of upcoming.rows) {
-
-      const msg = `
-🚨 *Invoice Raise Alert*
+      const msg =
+`🚨 *Invoice Raise Alert*
 
 Customer: ${row.customer_name}
 Plant: ${row.plant_name}
 PO Number: ${row.po_number || "Not Generated"}
-Period: ${row.period_number}
+Quarter: ${row.period_number}
 Due Date: ${row.due_date}
-      `;
 
-      for (let phone of accountsPhones) {
+Please raise the invoice.`;
+
+      for (const phone of invoiceUsers) {
         await sendWhatsApp(phone, msg);
       }
 
       await pool.query(
-        "UPDATE invoice_schedule SET notification_sent=TRUE WHERE id=$1",
+        `
+        UPDATE invoice_schedule
+        SET notification_sent = TRUE
+        WHERE id = $1
+        `,
         [row.id]
       );
     }
 
+    // ====================================================
+    // 2. PAYMENT REMINDER
+    // SEND TO USER ID = 5 (Accounts)
+    // ====================================================
 
-    // ==============================
-    // 2️⃣ PAYMENT REMINDER
-    // SENT TO ID 5 (ACCOUNTS)
-    // ==============================
     const paymentReminder = await pool.query(`
-      SELECT s.*, a.customer_name, a.plant_name
+      SELECT
+        s.*,
+        a.customer_name,
+        a.plant_name
       FROM invoice_schedule s
-      JOIN amc_site_entry a ON s.amc_id = a.id
+      JOIN amc_site_entry a
+      ON a.id = s.amc_id
       WHERE s.due_date = CURRENT_DATE - INTERVAL '20 days'
       AND s.payment_received = FALSE
     `);
 
-    const accountsPhones2 = await getUserPhonesByIds([5]);
+    for (const row of paymentReminder.rows) {
 
-    for (let row of paymentReminder.rows) {
-
-      const msg = `
-💰 *Payment Reminder (20 Days Overdue)*
+      const msg =
+`💰 *Payment Reminder*
 
 Customer: ${row.customer_name}
 Plant: ${row.plant_name}
 PO Number: ${row.po_number || "Not Generated"}
-Period: ${row.period_number}
+Quarter: ${row.period_number}
 Due Date: ${row.due_date}
-      `;
 
-      for (let phone of accountsPhones2) {
+Payment is pending for more than 20 days.`;
+
+      for (const phone of invoiceUsers) {
         await sendWhatsApp(phone, msg);
       }
     }
 
+    // ====================================================
+    // 3. AMC EXPIRY ALERT
+    // SEND TO USER ID = 4 & 6
+    // ====================================================
 
-    // ==============================
-    // 3️⃣ AMC ENDING THIS MONTH
-    // SENT TO ID 4 & 6 (MANAGERS)
-    // ==============================
+    const managerUsers = await getUserPhonesByIds([4, 6]);
+
     const now = new Date();
-    const firstDay = new Date(now.getFullYear(), now.getMonth(), 1);
-    const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0);
 
-    const endingAmc = await pool.query(`
-      SELECT customer_name, plant_name, amc_end_date
+    const firstDay = new Date(
+      now.getFullYear(),
+      now.getMonth(),
+      1
+    );
+
+    const lastDay = new Date(
+      now.getFullYear(),
+      now.getMonth() + 1,
+      0
+    );
+
+    const endingAmc = await pool.query(
+      `
+      SELECT
+        customer_name,
+        plant_name,
+        amc_end_date
       FROM amc_site_entry
       WHERE amc_end_date BETWEEN $1 AND $2
-    `, [firstDay, lastDay]);
-
-    const managerPhones = await getUserPhonesByIds([4, 6]);
+      `,
+      [firstDay, lastDay]
+    );
 
     if (endingAmc.rows.length > 0) {
 
-      let msg = `⚠️ *AMCs Ending This Month*\n\n`;
+      let msg = "⚠️ *AMCs Ending This Month*\n\n";
 
-      endingAmc.rows.forEach(r => {
-        msg += `• ${r.customer_name} - ${r.plant_name} (Ends: ${r.amc_end_date})\n`;
+      endingAmc.rows.forEach(row => {
+        msg +=
+`${row.customer_name}
+${row.plant_name}
+End Date: ${new Date(row.amc_end_date).toLocaleDateString("en-IN")}
+
+`;
       });
 
-      for (let phone of managerPhones) {
+      msg += "\nPlease initiate AMC renewal process.";
+
+      for (const phone of managerUsers) {
         await sendWhatsApp(phone, msg);
       }
     }

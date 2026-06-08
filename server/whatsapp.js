@@ -1,50 +1,74 @@
-const { 
-  default: makeWASocket, 
-  useMultiFileAuthState, 
-  DisconnectReason,
+const {
+  default: makeWASocket,
+  useMultiFileAuthState,
   fetchLatestBaileysVersion,
   Browsers
 } = require("@whiskeysockets/baileys");
 
 const qrcode = require("qrcode-terminal");
 
-let sock;
+let sock = null;
 let isWhatsAppReady = false;
 
 async function connectToWhatsApp() {
-  const { state, saveCreds } = await useMultiFileAuthState("auth_info_baileys");
+  try {
+    const { state, saveCreds } = await useMultiFileAuthState("auth_info_baileys");
 
-  const { version } = await fetchLatestBaileysVersion();
+    const { version } = await fetchLatestBaileysVersion();
 
-  sock = makeWASocket({
-    auth: state,
-    version,
-    printQRInTerminal: true,
-    browser: Browsers.macOS("Chrome")
-  });
+    sock = makeWASocket({
+      auth: state,
+      version,
+      printQRInTerminal: true,
+      browser: Browsers.macOS("Chrome")
+    });
 
-  sock.ev.on("creds.update", saveCreds);
+    sock.ev.on("creds.update", saveCreds);
 
-  sock.ev.on("connection.update", (update) => {
-    const { connection, qr } = update;
+    sock.ev.on("connection.update", async (update) => {
+      const { connection, qr } = update;
 
-    if (qr) qrcode.generate(qr, { small: true });
+      if (qr) {
+        qrcode.generate(qr, { small: true });
+      }
 
-    if (connection === "open") {
-      isWhatsAppReady = true;
-      console.log("WhatsApp Ready");
-    }
+      if (connection === "open") {
+        isWhatsAppReady = true;
 
-    if (connection === "close") {
-      isWhatsAppReady = false;
-      setTimeout(connectToWhatsApp, 5000);
-    }
-  });
+        console.log("✅ WhatsApp CONNECTED & READY ✅");
+
+        try {
+          await sock.sendMessage(
+            "919945712362@s.whatsapp.net",
+            {
+              text: "✅ AMC Portal WhatsApp Connected Successfully"
+            }
+          );
+
+          console.log("✅ Test WhatsApp message sent");
+        } catch (err) {
+          console.error("Test message failed:", err.message);
+        }
+      }
+
+      if (connection === "close") {
+        isWhatsAppReady = false;
+
+        console.log("⚠️ WhatsApp disconnected. Reconnecting...");
+
+        setTimeout(connectToWhatsApp, 5000);
+      }
+    });
+  } catch (err) {
+    console.error("WhatsApp Connection Error:", err);
+
+    setTimeout(connectToWhatsApp, 10000);
+  }
 }
 
 connectToWhatsApp();
 
 module.exports = {
-  sock,
-  isWhatsAppReady
+  getSock: () => sock,
+  isReady: () => isWhatsAppReady
 };
