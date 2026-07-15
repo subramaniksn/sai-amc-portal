@@ -549,8 +549,10 @@ router.get("/pending-by-customer", verifyToken, async (req, res) => {
 
     let query = `
       SELECT
+        a.id AS amc_id,
         a.customer_name,
         a.plant_name,
+        a.amc_start_date,
         a.total_amount_without_gst,
         COALESCE(SUM(
           CASE WHEN i.payment_received = true THEN i.amount ELSE 0 END

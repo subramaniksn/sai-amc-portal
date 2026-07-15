@@ -142,8 +142,8 @@ export default function AdminDashboard() {
   const formatCurrency = (num) =>
     new Intl.NumberFormat("en-IN").format(num || 0);
 
-  const getPendingForPlant = (plantName) => {
-    const p = pendingCustomer.find((row) => row.plant_name === plantName);
+  const getPendingForAmc = (amcId) => {
+    const p = pendingCustomer.find((row) => Number(row.amc_id) === Number(amcId));
     return {
       pending:  p?.pending_amount  || 0,
       received: p?.received_amount || 0
@@ -155,7 +155,7 @@ export default function AdminDashboard() {
   // ===============================
   const chartData = pendingCustomer
     .map((row) => ({
-      customer_name: row.plant_name,
+      customer_name: `${row.plant_name} (${new Date(row.amc_start_date).getFullYear()})`,
       received: Number(row.received_amount || 0),
       pending: Number(row.pending_amount || 0)
     }))
@@ -433,7 +433,7 @@ export default function AdminDashboard() {
           </TableHead>
           <TableBody>
             {data.map((d) => {
-              const payment    = getPendingForPlant(d.plant_name);
+              const payment    = getPendingForAmc(d.id);
               const pendingVal  = Number(payment?.pending  || 0);
               const receivedVal = Number(payment?.received || 0);
 
