@@ -65,7 +65,21 @@ async function getUserPhonesByIds(ids) {
 // PRODUCTION = 0 9 * * *
 // ======================================
 
-cron.schedule("0 10 * * *", async () => {
+const notificationCron = process.env.NOTIFICATION_CRON || "0 10 * * *";
+
+if (!cron.validate(notificationCron)) {
+  throw new Error("NOTIFICATION_CRON contains an invalid cron expression");
+}
+
+let cronRunning = false;
+
+cron.schedule(notificationCron, async () => {
+  if (cronRunning) {
+    console.log("Skipping notification cron because the previous run is still active");
+    return;
+  }
+
+  cronRunning = true;
   console.log("Running WhatsApp Invoice Cron...");
 
   try {
@@ -231,7 +245,11 @@ Please initiate AMC renewal process.`;
 
   } catch (err) {
     console.error("CRON ERROR:", err);
+  } finally {
+    cronRunning = false;
   }
+}, {
+  timezone: "Asia/Kolkata"
 });
 
 module.exports = {};
