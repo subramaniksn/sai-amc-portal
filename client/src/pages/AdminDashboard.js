@@ -43,6 +43,7 @@ export default function AdminDashboard() {
   const [yearList, setYearList] = useState([]);
   const [period, setPeriod] = useState("all");
   const [activeAmountSeries, setActiveAmountSeries] = useState("all");
+  const [showChart, setShowChart] = useState(false);
 
   const navigate = useNavigate();
   const user = JSON.parse(localStorage.getItem("user") || "{}");
@@ -164,6 +165,29 @@ export default function AdminDashboard() {
   const handleAmountLegendClick = (entry) => {
     const selected = entry.dataKey;
     setActiveAmountSeries((current) => current === selected ? "all" : selected);
+  };
+
+  const handleExport = async () => {
+    try {
+      const res = await api.get("/amc/export", {
+        params: {
+          status: amcStatus,
+          year: period === "all" ? undefined : period.split("-")[0]
+        },
+        responseType: "blob"
+      });
+      const url = window.URL.createObjectURL(new Blob([res.data]));
+      const link = document.createElement("a");
+      link.href = url;
+      link.setAttribute("download", `AMC_Report_${amcStatus}_${period}.xlsx`);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error("Export error:", err);
+      alert("Export failed");
+    }
   };
 
   return (
@@ -320,8 +344,20 @@ export default function AdminDashboard() {
         </Grid>
       </Grid>
 
+      <Box sx={{ mb: 3, display: "flex", gap: 2, flexWrap: "wrap" }}>
+        <Button variant="contained" component={Link} to="/add-amc">
+          Add AMC
+        </Button>
+        <Button variant="contained" color="success" onClick={handleExport}>
+          Export AMC
+        </Button>
+        <Button variant="outlined" onClick={() => setShowChart((current) => !current)}>
+          {showChart ? "Hide Chart" : "Show Chart"}
+        </Button>
+      </Box>
+
       {/* BAR CHART */}
-      <Card sx={{ mb: 4 }}>
+      {showChart && <Card sx={{ mb: 4 }}>
         <CardContent>
           <Typography variant="h6" gutterBottom>
             Collection Performance — All Plants
@@ -360,57 +396,7 @@ export default function AdminDashboard() {
             </BarChart>
           </ResponsiveContainer>
         </CardContent>
-      </Card>
-
-      {/* ACTION BUTTONS */}
-      <Box sx={{ mb: 3 }}>
-        {role?.toLowerCase() === "admin" && (
-          <>
-            <Button
-              variant="contained"
-              component={Link}
-              to="/add-amc"
-              sx={{ mr: 2 }}
-            >
-              Add AMC
-            </Button>
-            <Button
-              variant="contained"
-              color="success"
-              sx={{ mr: 2 }}
-              onClick={async () => {
-                try {
-                  const res = await api.get("/amc/export", {
-                    params: {
-                      status: amcStatus,
-                      year:
-                        period === "all"
-                          ? undefined
-                          : period.split("-")[0]
-                    },
-                    responseType: "blob"
-                  });
-                  const url  = window.URL.createObjectURL(new Blob([res.data]));
-                  const link = document.createElement("a");
-                  link.href  = url;
-                  link.setAttribute(
-                    "download",
-                    `AMC_Report_${amcStatus}_${period}.xlsx`
-                  );
-                  document.body.appendChild(link);
-                  link.click();
-                  link.remove();
-                } catch (err) {
-                  console.error("Export error:", err);
-                  alert("Export failed");
-                }
-              }}
-            >
-              Export AMC
-            </Button>
-          </>
-        )}
-      </Box>
+      </Card>}
 
       {/* AMC LIST TABLE */}
       <TableContainer component={Paper} sx={{ mt: 3, maxHeight: 500 }}>
