@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useParams, useLocation } from "react-router-dom";
+import { useParams, useLocation, useNavigate } from "react-router-dom";
 import api from "../api";
 
 import {
@@ -13,12 +13,14 @@ import {
   TableCell,
   TableBody,
   Paper,
-  TableContainer
+  TableContainer,
+  Button
 } from "@mui/material";
 
 export default function InvoiceList() {
   const { type } = useParams();
   const location = useLocation();
+  const navigate = useNavigate();
   const year = location.state?.year || "";
   const status = location.state?.status || "";  // ✅ read status from navigate state
 
@@ -71,6 +73,18 @@ export default function InvoiceList() {
     return "#ffffff";
   };
 
+  const formatAmount = (amount) => {
+    const value = Number(amount);
+    if (!Number.isFinite(value)) return "₹0.00";
+
+    return new Intl.NumberFormat("en-IN", {
+      style: "currency",
+      currency: "INR",
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2
+    }).format(value);
+  };
+
   // =========================
   // TITLE LABEL
   // =========================
@@ -78,13 +92,25 @@ export default function InvoiceList() {
     status === "live"      ? "🟢 Live" :
     status === "completed" ? "🔴 Completed" : "📋 All";
 
+  let user = {};
+  try {
+    user = JSON.parse(localStorage.getItem("user") || "{}");
+  } catch {
+    user = {};
+  }
+  const dashboardPath = user.role === "Viewer" ? "/viewer-sites" : "/dashboard";
+
   return (
     <Container maxWidth="lg">
 
-      {/* TITLE */}
-      <Typography variant="h4" gutterBottom sx={{ mb: 1 }}>
-        {type?.toUpperCase()} Invoices
-      </Typography>
+      <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 2, mb: 1 }}>
+        <Typography variant="h4">
+          {type?.toUpperCase()} Invoices
+        </Typography>
+        <Button variant="outlined" onClick={() => navigate(dashboardPath)}>
+          Back to Dashboard
+        </Button>
+      </Box>
 
       {/* SUBTITLE — shows which filter is active */}
       <Typography variant="subtitle1" color="text.secondary" sx={{ mb: 3 }}>
@@ -123,7 +149,7 @@ export default function InvoiceList() {
             {/* HEADER */}
             <TableHead>
               <TableRow>
-                {["Plant Name", "Customer", "PO Number", "Invoice Number", "Quarter", "Due Date", "Status"].map((head) => (
+                {["Plant Name", "Customer", "PO Number", "Invoice Number", "Quarter", "Quarter Amount", "Due Date", "Status"].map((head) => (
                   <TableCell
                     key={head}
                     sx={{
@@ -154,6 +180,7 @@ export default function InvoiceList() {
                   <TableCell>{d.po_number}</TableCell>
                   <TableCell>{d.invoice_number || "N/A"}</TableCell>
                   <TableCell>Q{d.period_number}</TableCell>
+                  <TableCell>{formatAmount(d.quarter_amount)}</TableCell>
                   <TableCell>{formatDate(d.due_date)}</TableCell>
                   <TableCell sx={{ fontWeight: "bold" }}>
                     {d.invoice_status}

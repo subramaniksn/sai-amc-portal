@@ -31,9 +31,9 @@ api.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response && error.response.status === 401) {
-      // Handle unauthorized access, e.g., redirect to login
-      console.log("Unauthorized! Redirecting to login...");
-      // window.location.href = "/login"; // uncomment if needed
+      localStorage.removeItem("token");
+      localStorage.removeItem("user");
+      window.dispatchEvent(new Event("auth-change"));
     }
     return Promise.reject(error);
   }

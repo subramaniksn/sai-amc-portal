@@ -12,12 +12,16 @@ import {
   MenuItem,
   FormControl,
   InputLabel,
-  Select
+  Select,
+  Snackbar,
+  Alert
 } from "@mui/material";
 
 export default function AMCForm() {
 
   const navigate = useNavigate();
+  const [saving, setSaving] = useState(false);
+  const [message, setMessage] = useState({ open: false, severity: "success", text: "" });
 
   const [form, setForm] = useState({
     customer_name: "",
@@ -54,10 +58,32 @@ export default function AMCForm() {
 
   try {
 
-    if (!form.invoice_raise_timing) {
-      alert("Please select Invoice Raise Timing");
+    const requiredFields = [
+      "customer_name",
+      "plant_name",
+      "amc_start_date",
+      "amc_end_date",
+      "billing_cycle",
+      "invoice_raise_timing",
+      "total_amount_without_gst"
+    ];
+
+    if (requiredFields.some((field) => !String(form[field] || "").trim())) {
+      setMessage({ open: true, severity: "error", text: "Please complete all required fields" });
       return;
     }
+
+    if (new Date(form.amc_end_date) < new Date(form.amc_start_date)) {
+      setMessage({ open: true, severity: "error", text: "AMC end date cannot be before the start date" });
+      return;
+    }
+
+    if (Number(form.total_amount_without_gst) < 0 || Number(form.plantcapacity_mw) < 0) {
+      setMessage({ open: true, severity: "error", text: "Capacity and amount cannot be negative" });
+      return;
+    }
+
+    setSaving(true);
 
     const payload = {
       customer_name: form.customer_name,
@@ -72,25 +98,28 @@ export default function AMCForm() {
       site_visit: form.site_visit,
       invoice_raise_timing: form.invoice_raise_timing,
       total_amount_without_gst: Number(form.total_amount_without_gst),
-      po_number: form.po_no
+      po_number: form.po_no,
+      po_date: form.po_date || null
     };
 
     // Create AMC
     await api.post("/amc", payload);
 
-    alert("AMC Created Successfully");
-
-    navigate("/dashboard");
+    setMessage({ open: true, severity: "success", text: "AMC created successfully" });
+    setTimeout(() => navigate("/dashboard"), 800);
 
   } catch (err) {
 
     console.error("Error creating AMC:", err.response?.data || err);
 
-    alert(
-      err.response?.data?.error ||
-      err.message ||
-      "Error creating AMC"
-    );
+    setMessage({
+      open: true,
+      severity: "error",
+      text: err.response?.data?.error || err.message || "Unable to create AMC"
+    });
+
+  } finally {
+    setSaving(false);
 
   }
 
@@ -125,7 +154,7 @@ export default function AMCForm() {
               { key: "po_date", label: "PO Date", type: "date" }
             ].map((field) => (
 
-              <Grid item xs={12} md={6} key={field.key}>
+              <Grid size={{ xs: 12, md: 6 }} key={field.key}>
 
                 <TextField
                   fullWidth
@@ -135,6 +164,7 @@ export default function AMCForm() {
                   InputLabelProps={field.type === "date" ? { shrink: true } : {}}
                   value={form[field.key]}
                   onChange={handleChange}
+                  required={["customer_name", "plant_name", "amc_start_date", "amc_end_date", "total_amount_without_gst"].includes(field.key)}
                 />
 
               </Grid>
@@ -143,9 +173,9 @@ export default function AMCForm() {
 
             {/* Billing Cycle */}
 
-            <Grid item xs={12} md={6}>
+            <Grid size={{ xs: 12, md: 6 }}>
 
-              <FormControl fullWidth>
+              <FormControl fullWidth required>
 
                 <InputLabel>Billing Cycle</InputLabel>
 
@@ -172,9 +202,9 @@ export default function AMCForm() {
 
             {/* Invoice Raise Timing */}
 
-            <Grid item xs={12} md={6}>
+            <Grid size={{ xs: 12, md: 6 }}>
 
-              <FormControl fullWidth>
+              <FormControl fullWidth required>
 
                 <InputLabel>Invoice Raise Timing</InputLabel>
 
@@ -203,13 +233,28 @@ export default function AMCForm() {
             variant="contained"
             sx={{ mt: 3 }}
             onClick={submit}
+            disabled={saving}
           >
-            Save AMC
+            {saving ? "Saving..." : "Save AMC"}
           </Button>
 
         </CardContent>
 
       </Card>
+
+      <Snackbar
+        open={message.open}
+        autoHideDuration={4000}
+        onClose={() => setMessage((current) => ({ ...current, open: false }))}
+      >
+        <Alert
+          severity={message.severity}
+          variant="filled"
+          onClose={() => setMessage((current) => ({ ...current, open: false }))}
+        >
+          {message.text}
+        </Alert>
+      </Snackbar>
 
     </Container>
 

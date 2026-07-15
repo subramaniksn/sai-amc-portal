@@ -23,14 +23,15 @@ import {
 } from "@mui/material";
 
 import {
-  BarChart,
+  ComposedChart,
   Bar,
+  Line,
   XAxis,
   YAxis,
   Tooltip,
   CartesianGrid,
   ResponsiveContainer,
-  Cell
+  Legend
 } from "recharts";
 
 export default function ViewerDashboard() {
@@ -198,8 +199,6 @@ export default function ViewerDashboard() {
 
   // ✅ year to pass in navigate state
   const currentYear = period === "all" ? "" : period.split("-")[0];
-
-  const barColors = ["#ff9800", "#1976d2", "#2e7d32", "#d32f2f", "#7b1fa2"];
 
   return (
     <Container maxWidth="lg">
@@ -390,11 +389,14 @@ export default function ViewerDashboard() {
       {/* CHART */}
       <Card sx={{ p: 3, mb: 4 }}>
         <Typography variant="h6" gutterBottom>
-          Customer Sites Overview
+          Customer Portfolio Overview
+        </Typography>
+        <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+          Site count and managed MW by customer. Select a bar to view its sites.
         </Typography>
         <ResponsiveContainer width="100%" height={350}>
-          <BarChart data={chartData} margin={{ bottom: 80 }}>
-            <CartesianGrid strokeDasharray="3 3" />
+          <ComposedChart data={chartData} margin={{ bottom: 80, right: 20 }}>
+            <CartesianGrid stroke="#eaecf0" vertical={false} />
             <XAxis
               dataKey="customer"
               tick={{ fontSize: 12 }}
@@ -402,14 +404,13 @@ export default function ViewerDashboard() {
               textAnchor="end"
               interval={0}
             />
-            <YAxis />
-            <Tooltip />
-            <Bar dataKey="sites" onClick={handleBarClick}>
-              {chartData.map((entry, index) => (
-                <Cell key={index} fill={barColors[index % barColors.length]} />
-              ))}
-            </Bar>
-          </BarChart>
+            <YAxis yAxisId="sites" allowDecimals={false} label={{ value: "Sites", angle: -90, position: "insideLeft" }} />
+            <YAxis yAxisId="mw" orientation="right" label={{ value: "MW", angle: 90, position: "insideRight" }} />
+            <Tooltip formatter={(value, name) => [Number(value).toLocaleString("en-IN"), name]} />
+            <Legend verticalAlign="top" height={32} />
+            <Bar yAxisId="sites" dataKey="sites" name="Sites" fill="#155eef" radius={[6, 6, 0, 0]} onClick={handleBarClick} />
+            <Line yAxisId="mw" type="monotone" dataKey="mw" name="Managed MW" stroke="#f79009" strokeWidth={3} dot={{ r: 4 }} />
+          </ComposedChart>
         </ResponsiveContainer>
       </Card>
 

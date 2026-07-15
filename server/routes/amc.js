@@ -1,7 +1,7 @@
 const express = require("express");
 const pool = require("../db");
 const ExcelJS = require("exceljs");
-const { verifyToken } = require("../middleware/auth");
+const { verifyToken, isAdmin } = require("../middleware/auth");
 
 const router = express.Router();
 
@@ -48,7 +48,9 @@ function generateInvoiceSchedule(startDate, endDate, timing, monthStep) {
 // ========================================
 // CREATE AMC
 // ========================================
-router.post("/", verifyToken, async (req, res) => {
+router.post("/", verifyToken, isAdmin, async (req, res) => {
+
+  const client = await pool.connect();
 
   try {
 
@@ -65,12 +67,49 @@ router.post("/", verifyToken, async (req, res) => {
       site_visit,
       invoice_raise_timing,
       total_amount_without_gst,
-      po_number
+      po_number,
+      po_date
     } = req.body;
 
-    const totalAmount = Number(total_amount_without_gst || 0);
+    const totalAmount = Number(total_amount_without_gst);
 
-    const amc = await pool.query(`
+    if (!customer_name || !plant_name || !amc_start_date || !amc_end_date) {
+      return res.status(400).json({ error: "Customer, plant, start date and end date are required" });
+    }
+
+    if (!Number.isFinite(totalAmount) || totalAmount < 0) {
+      return res.status(400).json({ error: "Total amount must be a valid non-negative number" });
+    }
+
+    const startTime = Date.parse(amc_start_date);
+    const endTime = Date.parse(amc_end_date);
+
+    if (!Number.isFinite(startTime) || !Number.isFinite(endTime)) {
+      return res.status(400).json({ error: "AMC dates must be valid" });
+    }
+
+    if (endTime < startTime) {
+      return res.status(400).json({ error: "AMC end date cannot be before start date" });
+    }
+
+    const cycle = (billing_cycle || "").toLowerCase();
+    const monthStep = cycle.includes("month") ? 1
+      : cycle.includes("quarter") ? 3
+      : cycle.includes("half") ? 6
+      : cycle.includes("year") ? 12
+      : 0;
+
+    if (!monthStep) {
+      return res.status(400).json({ error: "A valid billing cycle is required" });
+    }
+
+    if (!["START", "END"].includes(invoice_raise_timing)) {
+      return res.status(400).json({ error: "Invoice raise timing must be START or END" });
+    }
+
+    await client.query("BEGIN");
+
+    const amc = await client.query(`
       INSERT INTO amc_site_entry (
         customer_name,
         plant_name,
@@ -109,41 +148,34 @@ router.post("/", verifyToken, async (req, res) => {
     // AUTO CREATE INVOICE SCHEDULE
     if (billing_cycle) {
 
-      let schedule = [];
-      const cycle = billing_cycle.toLowerCase();
-
-      if (cycle.includes("month")) {
-        schedule = generateInvoiceSchedule(amc_start_date, amc_end_date, invoice_raise_timing, 1);
-      } 
-      else if (cycle.includes("quarter")) {
-        schedule = generateInvoiceSchedule(amc_start_date, amc_end_date, invoice_raise_timing, 3);
-      } 
-      else if (cycle.includes("half")) {
-        schedule = generateInvoiceSchedule(amc_start_date, amc_end_date, invoice_raise_timing, 6);
-      } 
-      else if (cycle.includes("year")) {
-        schedule = generateInvoiceSchedule(amc_start_date, amc_end_date, invoice_raise_timing, 12);
-      }
+      const schedule = generateInvoiceSchedule(
+        amc_start_date,
+        amc_end_date,
+        invoice_raise_timing,
+        monthStep
+      );
 
       const amountPerPeriod =
         schedule.length > 0 ? totalAmount / schedule.length : 0;
 
       for (const s of schedule) {
-        await pool.query(`
+        await client.query(`
           INSERT INTO invoice_schedule (
             amc_id,
             period_number,
             due_date,
             po_number,
+            po_date,
             amount,
             invoice_amount
           )
-          VALUES ($1,$2,$3,$4,$5,$6)
+          VALUES ($1,$2,$3,$4,$5,$6,$7)
         `, [
           amcId,
           s.period_number,
           s.due_date,
           po_number || null,
+          po_date || null,
           amountPerPeriod,
           amountPerPeriod
         ]);
@@ -151,11 +183,15 @@ router.post("/", verifyToken, async (req, res) => {
 
     }
 
+    await client.query("COMMIT");
     res.json(amc.rows[0]);
 
   } catch (err) {
+    await client.query("ROLLBACK");
     console.error("CREATE AMC ERROR:", err);
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ error: "Unable to create AMC" });
+  } finally {
+    client.release();
   }
 
 });
@@ -164,7 +200,7 @@ router.post("/", verifyToken, async (req, res) => {
 // ========================================
 // GET AMC LIST
 // ========================================
-router.get("/", async (req, res) => {
+router.get("/", verifyToken, async (req, res) => {
   try {
     const { year, status } = req.query;
 
@@ -172,7 +208,7 @@ router.get("/", async (req, res) => {
       SELECT 
         a.*,
         MAX(i.po_number) AS po_number,
-        MAX(i.invoice_date) AS po_date
+        MAX(i.po_date) AS po_date
       FROM amc_site_entry a
       LEFT JOIN invoice_schedule i ON a.id = i.amc_id
     `;
@@ -220,11 +256,13 @@ router.get("/schedule/:amcId", verifyToken, async (req, res) => {
         period_number,
         due_date,
         po_number,
+        po_date,
         amount,
         invoice_number,
         invoice_date,
         invoice_raised,
-        payment_received
+        payment_received,
+        payment_date
       FROM invoice_schedule
       WHERE amc_id=$1
       ORDER BY period_number
@@ -242,7 +280,7 @@ router.get("/schedule/:amcId", verifyToken, async (req, res) => {
 // ========================================
 // RAISE INVOICE
 // ========================================
-router.put("/raise/:scheduleId", verifyToken, async (req, res) => {
+router.put("/raise/:scheduleId", verifyToken, isAdmin, async (req, res) => {
 
   try {
 
@@ -270,25 +308,43 @@ router.put("/raise/:scheduleId", verifyToken, async (req, res) => {
 // ========================================
 // RECEIVE PAYMENT
 // ========================================
-router.put("/receive/:scheduleId", verifyToken, async (req, res) => {
+router.put("/receive/:scheduleId", verifyToken, isAdmin, async (req, res) => {
+
+  const client = await pool.connect();
 
   try {
-
-    const { amount } = req.body;
     const scheduleId = req.params.scheduleId;
 
-    const schedule = await pool.query(
-      "SELECT * FROM invoice_schedule WHERE id=$1",
+    await client.query("BEGIN");
+
+    const schedule = await client.query(
+      "SELECT * FROM invoice_schedule WHERE id=$1 FOR UPDATE",
       [scheduleId]
     );
 
     if (schedule.rows.length === 0) {
+      await client.query("ROLLBACK");
       return res.status(404).json({ message: "Schedule not found" });
     }
 
     const row = schedule.rows[0];
 
-    await pool.query(`
+    if (row.payment_received) {
+      await client.query("ROLLBACK");
+      return res.status(409).json({ message: "Payment has already been received" });
+    }
+
+    if (!row.invoice_raised) {
+      await client.query("ROLLBACK");
+      return res.status(400).json({ message: "Invoice must be raised before receiving payment" });
+    }
+
+    const amount = Number(row.invoice_amount ?? row.amount);
+    if (!Number.isFinite(amount) || amount < 0) {
+      throw new Error("Invalid invoice amount stored for schedule");
+    }
+
+    await client.query(`
       UPDATE invoice_schedule
       SET
         payment_received = TRUE,
@@ -297,17 +353,22 @@ router.put("/receive/:scheduleId", verifyToken, async (req, res) => {
       WHERE id = $1
     `, [scheduleId]);
 
-    await pool.query(`
+    await client.query(`
       UPDATE amc_site_entry
       SET balance_amount_without_gst =
-      balance_amount_without_gst - $1
+      GREATEST(balance_amount_without_gst - $1, 0)
       WHERE id = $2
     `, [amount, row.amc_id]);
 
+    await client.query("COMMIT");
     res.json({ message: "Payment received successfully" });
 
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    await client.query("ROLLBACK");
+    console.error("RECEIVE PAYMENT ERROR:", err);
+    res.status(500).json({ error: "Unable to receive payment" });
+  } finally {
+    client.release();
   }
 
 });
@@ -398,6 +459,7 @@ router.get("/export", verifyToken, async (req, res) => {
         a.customer_name,
         a.plant_name,
         MAX(i.po_number) AS po_number,
+        TO_CHAR(MAX(i.po_date), 'DD-MM-YYYY') AS po_date,
         TO_CHAR(a.amc_start_date, 'DD-MM-YYYY') AS amc_start_date,
         TO_CHAR(a.amc_end_date, 'DD-MM-YYYY') AS amc_end_date,
         SUM(i.invoice_amount) AS total_amount,
@@ -452,6 +514,7 @@ router.get("/export", verifyToken, async (req, res) => {
       { header: "Customer Name",   key: "customer_name",   width: 25 },
       { header: "Plant Name",      key: "plant_name",      width: 25 },
       { header: "PO Number",       key: "po_number",       width: 20 },
+      { header: "PO Date",         key: "po_date",         width: 18 },
       { header: "AMC Start Date",  key: "amc_start_date",  width: 18 },
       { header: "AMC End Date",    key: "amc_end_date",    width: 18 },
       { header: "Total Amount",    key: "total_amount",    width: 18 },
@@ -536,33 +599,6 @@ router.get("/pending-by-customer", verifyToken, async (req, res) => {
 // ========================================
 // GET SINGLE AMC
 // ========================================
-router.get("/:id", verifyToken, async (req, res) => {
-
-  try {
-
-    const result = await pool.query(`
-      SELECT *
-      FROM amc_site_entry
-      WHERE id = $1
-    `, [req.params.id]);
-
-    if (result.rows.length === 0) {
-      return res.status(404).json({ message: "AMC not found" });
-    }
-
-    res.json(result.rows[0]);
-
-  } catch (err) {
-    console.error("GET AMC ERROR:", err);
-    res.status(500).json({ error: err.message });
-  }
-
-});
-
-
-// ========================================
-// ENDING SOON
-// ========================================
 router.get("/ending-soon", verifyToken, async (req, res) => {
   try {
     const { year } = req.query;
@@ -585,11 +621,33 @@ router.get("/ending-soon", verifyToken, async (req, res) => {
 
     const result = await pool.query(query, values);
     res.json(result.rows);
-
   } catch (err) {
     console.error("ENDING AMC ERROR:", err);
+    res.status(500).json({ error: "Unable to load ending AMCs" });
+  }
+});
+
+router.get("/:id", verifyToken, async (req, res) => {
+
+  try {
+
+    const result = await pool.query(`
+      SELECT *
+      FROM amc_site_entry
+      WHERE id = $1
+    `, [req.params.id]);
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ message: "AMC not found" });
+    }
+
+    res.json(result.rows[0]);
+
+  } catch (err) {
+    console.error("GET AMC ERROR:", err);
     res.status(500).json({ error: err.message });
   }
+
 });
 
 

@@ -36,8 +36,9 @@ export default function Login() {
 
       // Save user
       localStorage.setItem("user", JSON.stringify(res.data.user));
+      window.dispatchEvent(new Event("auth-change"));
 
-      navigate("/dashboard", { replace: true });
+      navigate(res.data.user.role === "Viewer" ? "/viewer-sites" : "/dashboard", { replace: true });
 
     } catch (err) {
 

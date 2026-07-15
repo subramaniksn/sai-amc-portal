@@ -9,7 +9,10 @@ import {
   Grid,
   TextField,
   Button,
-  Checkbox
+  Checkbox,
+  Chip,
+  Snackbar,
+  Alert
 } from "@mui/material";
 
 const formatDate = (date) => {
@@ -23,6 +26,20 @@ export default function EditAMC() {
 
   const [amc, setAmc] = useState({});
   const [schedule, setSchedule] = useState([]);
+  const [message, setMessage] = useState({ open: false, severity: "success", text: "" });
+  const [savingId, setSavingId] = useState(null);
+
+  const formatAmount = (amount) => new Intl.NumberFormat("en-IN", {
+    style: "currency",
+    currency: "INR",
+    maximumFractionDigits: 2
+  }).format(Number(amount || 0));
+
+  const getStatus = (row) => {
+    if (row.payment_received) return { label: "Paid", color: "success" };
+    if (row.invoice_raised || row.invoice_number) return { label: "Payment Pending", color: "warning" };
+    return { label: "Not Raised", color: "default" };
+  };
 
   useEffect(() => {
 
@@ -33,10 +50,14 @@ export default function EditAMC() {
         setAmc(amcRes.data);
 
         const scheduleRes = await api.get(`/amc/schedule/${id}`);
-        setSchedule(scheduleRes.data);
+        setSchedule(scheduleRes.data.map((row) => ({
+          ...row,
+          _was_payment_received: Boolean(row.payment_received)
+        })));
 
       } catch (err) {
         console.error("Fetch Error:", err);
+        setMessage({ open: true, severity: "error", text: "Unable to load AMC invoice details" });
       }
     };
 
@@ -62,23 +83,56 @@ export default function EditAMC() {
     try {
       if (!rowId) {
         console.error("❌ No rowId! Check table data:", row);
-        alert("Invalid row ID");
+        setMessage({ open: true, severity: "error", text: "Invalid invoice schedule" });
         return;
       }
+
+      if (row.payment_received && !row._was_payment_received) {
+        if (!row.invoice_number || !row.invoice_date) {
+          setMessage({ open: true, severity: "error", text: "Enter invoice number and invoice date before receiving payment" });
+          return;
+        }
+
+        if (!window.confirm("Confirm that payment has been received? This action cannot be reversed.")) {
+          return;
+        }
+      }
+
+      setSavingId(rowId);
       
       const payload = {
         po_number: row.po_number || null,
+        po_date: row.po_date || null,
         invoice_number: row.invoice_number || null,
-        invoice_date: row.invoice_date || null,
-        payment_received: Boolean(row.payment_received),
-        payment_date: row.payment_date || null
+        invoice_date: row.invoice_date || null
       };
       
       console.log("✅ Saving rowId:", rowId, payload);
       await api.put(`/invoice/update/${rowId}`, payload);
-      alert("✅ Saved!");
+
+      if (row.payment_received && !row._was_payment_received) {
+        await api.put(`/amc/receive/${rowId}`);
+      }
+
+      setSchedule((current) => current.map((item) =>
+        item.id === rowId
+          ? {
+              ...item,
+              invoice_raised: Boolean(item.invoice_number),
+              _was_payment_received: Boolean(item.payment_received)
+            }
+          : item
+      ));
+      setMessage({ open: true, severity: "success", text: "Invoice schedule saved successfully" });
     } catch (err) {
       console.error("Save error:", err.response?.data || err);
+      setMessage({
+        open: true,
+        severity: "error",
+        text: err.response?.data?.error || err.response?.data?.message || "Unable to save invoice schedule"
+      });
+    } finally {
+      setSavingId(null);
     }
   };
 
@@ -123,6 +177,10 @@ export default function EditAMC() {
 
             <Grid container spacing={2} alignItems="center">
 
+              <Grid item xs={12}>
+                <Chip {...getStatus(row)} size="small" />
+              </Grid>
+
               <Grid item xs={1}>
                 <Typography>
                   P{row.period_number}
@@ -137,7 +195,7 @@ export default function EditAMC() {
 
               <Grid item xs={1}>
                 <Typography>
-                  ₹ {row.amount}
+                  {formatAmount(row.invoice_amount ?? row.amount)}
                 </Typography>
               </Grid>
 
@@ -145,6 +203,7 @@ export default function EditAMC() {
                 <TextField
                   label="PO Number"
                   value={row.po_number || ""}
+                  disabled={row._was_payment_received}
                   onChange={(e) =>
                     handleChange(index, "po_number", e.target.value)
                   }
@@ -154,8 +213,23 @@ export default function EditAMC() {
 
               <Grid item xs={2}>
                 <TextField
+                  type="date"
+                  label="PO Date"
+                  InputLabelProps={{ shrink: true }}
+                  value={row.po_date ? formatDate(row.po_date) : ""}
+                  disabled={row._was_payment_received}
+                  onChange={(e) =>
+                    handleChange(index, "po_date", e.target.value)
+                  }
+                  fullWidth
+                />
+              </Grid>
+
+              <Grid item xs={2}>
+                <TextField
                   label="Invoice Number"
                   value={row.invoice_number || ""}
+                  disabled={row._was_payment_received}
                   onChange={(e) =>
                     handleChange(index, "invoice_number", e.target.value)
                   }
@@ -169,6 +243,7 @@ export default function EditAMC() {
                   label="Invoice Date"
                   InputLabelProps={{ shrink: true }}
                   value={row.invoice_date ? formatDate(row.invoice_date) : ""}
+                  disabled={row._was_payment_received}
                   onChange={(e) =>
                     handleChange(index, "invoice_date", e.target.value)
                   }
@@ -182,9 +257,7 @@ export default function EditAMC() {
                   label="Payment Date"
                   InputLabelProps={{ shrink: true }}
                   value={row.payment_date ? formatDate(row.payment_date) : ""}
-                  onChange={(e) =>
-                    handleChange(index, "payment_date", e.target.value)
-                  }
+                  disabled
                   fullWidth
                 />
               </Grid>
@@ -195,9 +268,7 @@ export default function EditAMC() {
                 </Typography>
                 <Checkbox
                   checked={row.invoice_raised || false}
-                  onChange={(e) =>
-                    handleChange(index, "invoice_raised", e.target.checked)
-                  }
+                  disabled
                 />
               </Grid>
 
@@ -207,6 +278,7 @@ export default function EditAMC() {
                 </Typography>
                 <Checkbox
                   checked={row.payment_received || false}
+                  disabled={row._was_payment_received || !row.invoice_number || !row.invoice_date}
                   onChange={(e) =>
                     handleChange(index, "payment_received", e.target.checked)
                   }
@@ -217,10 +289,11 @@ export default function EditAMC() {
                 <Button
                   variant="contained"
                   color="primary"
-                  onClick={() => saveRow(row, row.id)}  // ✅ Pass row + ID
+                  onClick={() => saveRow(row, row.id)}
+                  disabled={row._was_payment_received || savingId === row.id}
                   fullWidth
                 >
-                  Save
+                  {savingId === row.id ? "Saving..." : "Save"}
                 </Button>
               </Grid>
 
@@ -230,6 +303,20 @@ export default function EditAMC() {
         </Card>
 
       ))}
+
+      <Snackbar
+        open={message.open}
+        autoHideDuration={4000}
+        onClose={() => setMessage((current) => ({ ...current, open: false }))}
+      >
+        <Alert
+          severity={message.severity}
+          variant="filled"
+          onClose={() => setMessage((current) => ({ ...current, open: false }))}
+        >
+          {message.text}
+        </Alert>
+      </Snackbar>
 
     </Container>
 

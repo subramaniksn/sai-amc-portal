@@ -65,3 +65,14 @@ exports.isViewerOrAdmin = (req, res, next) => {
   next();
 
 };
+
+// ========================================
+// ADMIN OR MANAGER ACCESS
+// ========================================
+exports.isAdminOrManager = (req, res, next) => {
+  if (!req.user || !["Admin", "Manager"].includes(req.user.role)) {
+    return res.status(403).json({ error: "Admin or Manager access only" });
+  }
+
+  next();
+};

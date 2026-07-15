@@ -15,10 +15,14 @@ router.post("/login", async (req, res) => {
 
     const { email, password } = req.body;
 
+    if (typeof email !== "string" || typeof password !== "string" || !email.trim() || !password) {
+      return res.status(400).json({ error: "Email and password are required" });
+    }
+
     // Find user by email
     const result = await pool.query(
       "SELECT * FROM users WHERE email = $1",
-      [email]
+      [email.trim().toLowerCase()]
     );
 
     if (result.rows.length === 0) {

@@ -29,6 +29,8 @@ import {
   XAxis,
   YAxis,
   Tooltip,
+  CartesianGrid,
+  Legend,
   ResponsiveContainer,
 } from "recharts";
 
@@ -40,6 +42,7 @@ export default function AdminDashboard() {
   const [invoiceSummary, setInvoiceSummary] = useState({ due: 0, pending: 0, paid: 0 });
   const [yearList, setYearList] = useState([]);
   const [period, setPeriod] = useState("all");
+  const [activeAmountSeries, setActiveAmountSeries] = useState("all");
 
   const navigate = useNavigate();
   const user = JSON.parse(localStorage.getItem("user") || "{}");
@@ -150,10 +153,18 @@ export default function AdminDashboard() {
   // ===============================
   // CHART DATA
   // ===============================
-  const chartData = pendingCustomer.map((row) => ({
-    customer_name: row.plant_name,
-    pending: row.pending_amount || 0
-  }));
+  const chartData = pendingCustomer
+    .map((row) => ({
+      customer_name: row.plant_name,
+      received: Number(row.received_amount || 0),
+      pending: Number(row.pending_amount || 0)
+    }))
+    .sort((a, b) => b.pending - a.pending);
+
+  const handleAmountLegendClick = (entry) => {
+    const selected = entry.dataKey;
+    setActiveAmountSeries((current) => current === selected ? "all" : selected);
+  };
 
   return (
     <Container maxWidth="xl">
@@ -313,29 +324,39 @@ export default function AdminDashboard() {
       <Card sx={{ mb: 4 }}>
         <CardContent>
           <Typography variant="h6" gutterBottom>
-            Pending Amount by Customer
+            Collection Performance — All Plants
           </Typography>
-          <ResponsiveContainer width="100%" height={300}>
-            <BarChart data={chartData} margin={{ bottom: 80 }}>
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+            Received versus pending AMC value for every plant. Click a legend item to isolate it.
+          </Typography>
+          <ResponsiveContainer width="100%" height={Math.max(420, chartData.length * 42)}>
+            <BarChart data={chartData} layout="vertical" margin={{ left: 20, right: 30 }}>
+              <CartesianGrid stroke="#eaecf0" horizontal={false} />
               <XAxis
-                dataKey="customer_name"
-                tick={{ fontSize: 12 }}
-                angle={-35}
-                textAnchor="end"
-                interval={0}
+                type="number"
+                tickFormatter={(value) => `₹ ${new Intl.NumberFormat("en-IN", { notation: "compact" }).format(value)}`}
               />
-              <YAxis
-                width={100}
-                tickFormatter={(value) =>
-                  `₹ ${new Intl.NumberFormat("en-IN").format(value)}`
-                }
+              <YAxis type="category" dataKey="customer_name" width={150} tick={{ fontSize: 12 }} />
+              <Tooltip formatter={(value) => `₹ ${new Intl.NumberFormat("en-IN").format(value)}`} />
+              <Legend
+                onClick={handleAmountLegendClick}
+                wrapperStyle={{ cursor: "pointer" }}
               />
-              <Tooltip
-                formatter={(value) =>
-                  `₹ ${new Intl.NumberFormat("en-IN").format(value)}`
-                }
+              <Bar
+                dataKey="received"
+                name="Received"
+                stackId="amount"
+                fill="#079455"
+                hide={activeAmountSeries !== "all" && activeAmountSeries !== "received"}
               />
-              <Bar dataKey="pending" fill="#ff9800" />
+              <Bar
+                dataKey="pending"
+                name="Pending"
+                stackId="amount"
+                fill="#f79009"
+                radius={[0, 6, 6, 0]}
+                hide={activeAmountSeries !== "all" && activeAmountSeries !== "pending"}
+              />
             </BarChart>
           </ResponsiveContainer>
         </CardContent>

@@ -15,9 +15,41 @@ import InvoiceList from "./pages/InvoiceList";
 
 const theme = createTheme({
   palette: {
-    primary: { main: "#1976d2" },
-    secondary: { main: "#ff9800" },
+    primary: { main: "#155eef", dark: "#0b3ea8" },
+    secondary: { main: "#f79009" },
+    success: { main: "#079455" },
+    warning: { main: "#dc6803" },
+    error: { main: "#d92d20" },
+    background: { default: "#f7f9fc", paper: "#ffffff" },
   },
+  typography: {
+    fontFamily: 'Inter, "Segoe UI", Roboto, Arial, sans-serif',
+    h4: { fontWeight: 700, letterSpacing: "-0.02em" },
+    h5: { fontWeight: 700 },
+    h6: { fontWeight: 600 },
+    button: { fontWeight: 600, textTransform: "none" }
+  },
+  shape: { borderRadius: 12 },
+  components: {
+    MuiAppBar: {
+      styleOverrides: {
+        root: { backgroundImage: "linear-gradient(100deg, #0b3ea8 0%, #155eef 70%, #2970ff 100%)" }
+      }
+    },
+    MuiCard: {
+      defaultProps: { elevation: 0 },
+      styleOverrides: {
+        root: {
+          border: "1px solid #e4e7ec",
+          boxShadow: "0 4px 14px rgba(16, 24, 40, 0.06)",
+          transition: "transform 160ms ease, box-shadow 160ms ease"
+        }
+      }
+    },
+    MuiButton: {
+      styleOverrides: { root: { borderRadius: 8, paddingInline: 18 } }
+    }
+  }
 });
 
 function App() {
@@ -25,36 +57,29 @@ function App() {
 
   // ✅ Fixed: Listen to localStorage changes properly
   useEffect(() => {
-    const handleStorageChange = () => {
+    const handleAuthChange = () => {
       setToken(localStorage.getItem("token"));
     };
 
     // Listen to storage events (works across tabs)
-    window.addEventListener("storage", handleStorageChange);
-    
-    // Poll for local changes (fixes login issue)
-    const interval = setInterval(() => {
-      const currentToken = localStorage.getItem("token");
-      if (currentToken !== token) {
-        setToken(currentToken);
-      }
-    }, 100);
+    window.addEventListener("storage", handleAuthChange);
+    window.addEventListener("auth-change", handleAuthChange);
 
     return () => {
-      window.removeEventListener("storage", handleStorageChange);
-      clearInterval(interval);
+      window.removeEventListener("storage", handleAuthChange);
+      window.removeEventListener("auth-change", handleAuthChange);
     };
-  }, [token]);
+  }, []);
 
   return (
     <ThemeProvider theme={theme}>
       <CssBaseline />
-      <BrowserRouter>
+      <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
         {/* ✅ Navbar inside BrowserRouter */}
         {token && <Navbar />}
         
         <Container maxWidth="xl">
-          <Box sx={{ mt: token ? 8 : 8 }}>
+          <Box sx={{ mt: token ? 4 : 0, pb: 5 }}>
             <Routes>
               {/* ✅ FIXED: Role-based login redirect */}
               <Route
