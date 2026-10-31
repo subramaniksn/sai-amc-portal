@@ -199,19 +199,21 @@ export default function EditAMC() {
             <Grid item xs={12} md={6}>
               <TextField
                 fullWidth
-                label="SCADA Make"
+                label="SCADA Make (comma-separated)"
                 value={amcEdit.scada_make}
                 onChange={(e) => setAmcEdit({ ...amcEdit, scada_make: e.target.value })}
                 disabled={savingAmc}
+                placeholder="e.g. ABB, Siemens, Phoenix"
               />
             </Grid>
             <Grid item xs={12} md={6}>
               <TextField
                 fullWidth
-                label="PLC Make"
+                label="PLC Make (comma-separated)"
                 value={amcEdit.plc_make}
                 onChange={(e) => setAmcEdit({ ...amcEdit, plc_make: e.target.value })}
                 disabled={savingAmc}
+                placeholder="e.g. ABB, Siemens, Phoenix"
               />
             </Grid>
             <Grid item xs={12}>

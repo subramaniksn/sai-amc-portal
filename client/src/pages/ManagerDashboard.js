@@ -135,18 +135,37 @@ export default function ManagerDashboard() {
   );
 
   // SCADA / PLC make counts (distinct plants per make)
+  // Supports comma-separated multiple makes per site, e.g. "ABB, Siemens, Phoenix"
   const scadaCounts = Object.entries(
     distinctSites(sites).reduce((acc, s) => {
-      const make = s.scada_make || "Not Specified";
-      acc[make] = (acc[make] || 0) + 1;
+      const makes = (s.scada_make || "")
+        .split(",")
+        .map((m) => m.trim())
+        .filter(Boolean);
+      if (makes.length === 0) {
+        acc["Not Specified"] = (acc["Not Specified"] || 0) + 1;
+      } else {
+        makes.forEach((make) => {
+          acc[make] = (acc[make] || 0) + 1;
+        });
+      }
       return acc;
     }, {})
   ).sort((a, b) => b[1] - a[1]);
 
   const plcCounts = Object.entries(
     distinctSites(sites).reduce((acc, s) => {
-      const make = s.plc_make || "Not Specified";
-      acc[make] = (acc[make] || 0) + 1;
+      const makes = (s.plc_make || "")
+        .split(",")
+        .map((m) => m.trim())
+        .filter(Boolean);
+      if (makes.length === 0) {
+        acc["Not Specified"] = (acc["Not Specified"] || 0) + 1;
+      } else {
+        makes.forEach((make) => {
+          acc[make] = (acc[make] || 0) + 1;
+        });
+      }
       return acc;
     }, {})
   ).sort((a, b) => b[1] - a[1]);

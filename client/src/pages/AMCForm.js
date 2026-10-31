@@ -39,9 +39,7 @@ export default function AMCForm() {
     po_no: "",
     po_date: "",
     scada_make: "",
-    scada_make_other: "",
-    plc_make: "",
-    plc_make_other: ""
+    plc_make: ""
   });
 
   const handleChange = (e) => {
@@ -114,8 +112,8 @@ export default function AMCForm() {
         : Number(form.total_amount_without_gst),
       po_number: form.po_no,
       po_date: form.po_date || null,
-      scada_make: form.scada_make === "Other" ? form.scada_make_other : form.scada_make || null,
-      plc_make: form.plc_make === "Other" ? form.plc_make_other : form.plc_make || null
+      scada_make: form.scada_make || null,
+      plc_make: form.plc_make || null
     };
 
     // Create AMC
@@ -243,69 +241,28 @@ export default function AMCForm() {
 
             </Grid>
 
-            {/* SCADA Make */}
+            {/* SCADA Make — enter multiple makes separated by comma, e.g. ABB, Siemens, Phoenix */}
             <Grid size={{ xs: 12, md: 6 }}>
-              <FormControl fullWidth>
-                <InputLabel>SCADA Make</InputLabel>
-                <Select
-                  name="scada_make"
-                  value={form.scada_make}
-                  onChange={(e) => {
-                    setForm({ ...form, scada_make: e.target.value, scada_make_other: e.target.value === "Other" ? form.scada_make_other : "" });
-                  }}
-                >
-                  <MenuItem value=""><em>Select</em></MenuItem>
-                  <MenuItem value="Schneider Electric">Schneider Electric</MenuItem>
-                  <MenuItem value="Siemens">Siemens</MenuItem>
-                  <MenuItem value="ABB">ABB</MenuItem>
-                  <MenuItem value="Mitsubishi">Mitsubishi</MenuItem>
-                  <MenuItem value="Delta">Delta</MenuItem>
-                  <MenuItem value="Other">Other</MenuItem>
-                </Select>
-              </FormControl>
-              {form.scada_make === "Other" && (
-                <TextField
-                  fullWidth
-                  label="Specify SCADA Make"
-                  name="scada_make_other"
-                  value={form.scada_make_other}
-                  onChange={handleChange}
-                  margin="dense"
-                />
-              )}
+              <TextField
+                fullWidth
+                label="SCADA Make (comma-separated)"
+                name="scada_make"
+                value={form.scada_make}
+                onChange={handleChange}
+                placeholder="e.g. ABB, Siemens, Phoenix"
+              />
             </Grid>
 
-            {/* PLC Make */}
+            {/* PLC Make — enter multiple makes separated by comma, e.g. ABB, Siemens, Phoenix */}
             <Grid size={{ xs: 12, md: 6 }}>
-              <FormControl fullWidth>
-                <InputLabel>PLC Make</InputLabel>
-                <Select
-                  name="plc_make"
-                  value={form.plc_make}
-                  onChange={(e) => {
-                    setForm({ ...form, plc_make: e.target.value, plc_make_other: e.target.value === "Other" ? form.plc_make_other : "" });
-                  }}
-                >
-                  <MenuItem value=""><em>Select</em></MenuItem>
-                  <MenuItem value="Siemens">Siemens</MenuItem>
-                  <MenuItem value="Schneider Electric">Schneider Electric</MenuItem>
-                  <MenuItem value="ABB">ABB</MenuItem>
-                  <MenuItem value="Mitsubishi">Mitsubishi</MenuItem>
-                  <MenuItem value="Omron">Omron</MenuItem>
-                  <MenuItem value="Allen-Bradley">Allen-Bradley</MenuItem>
-                  <MenuItem value="Other">Other</MenuItem>
-                </Select>
-              </FormControl>
-              {form.plc_make === "Other" && (
-                <TextField
-                  fullWidth
-                  label="Specify PLC Make"
-                  name="plc_make_other"
-                  value={form.plc_make_other}
-                  onChange={handleChange}
-                  margin="dense"
-                />
-              )}
+              <TextField
+                fullWidth
+                label="PLC Make (comma-separated)"
+                name="plc_make"
+                value={form.plc_make}
+                onChange={handleChange}
+                placeholder="e.g. ABB, Siemens, Phoenix"
+              />
             </Grid>
 
           </Grid>
