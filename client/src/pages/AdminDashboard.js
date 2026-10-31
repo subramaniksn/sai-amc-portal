@@ -140,6 +140,34 @@ export default function AdminDashboard() {
     (sum, row) => sum + Number(row.pending_amount || 0), 0
   );
 
+  // Count distinct plants (sites) so a multi-year AMC is not counted per year
+  const distinctSites = (arr) => {
+    const seen = new Set();
+    return arr.filter((s) => {
+      const key = s.plant_name || "";
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+  };
+
+  // SCADA / PLC make counts (distinct plants per make)
+  const scadaCounts = Object.entries(
+    distinctSites(data).reduce((acc, s) => {
+      const make = s.scada_make || "Not Specified";
+      acc[make] = (acc[make] || 0) + 1;
+      return acc;
+    }, {})
+  ).sort((a, b) => b[1] - a[1]);
+
+  const plcCounts = Object.entries(
+    distinctSites(data).reduce((acc, s) => {
+      const make = s.plc_make || "Not Specified";
+      acc[make] = (acc[make] || 0) + 1;
+      return acc;
+    }, {})
+  ).sort((a, b) => b[1] - a[1]);
+
   const formatCurrency = (num) =>
     new Intl.NumberFormat("en-IN").format(num || 0);
 
@@ -305,7 +333,7 @@ export default function AdminDashboard() {
             })}
           >
             <CardContent>
-              <Typography variant="h6">Due Invoices</Typography>
+              <Typography variant="h6">Invoice Due</Typography>
               <Typography variant="h4" color="error">
                 {invoiceSummary.due}
               </Typography>
@@ -320,7 +348,7 @@ export default function AdminDashboard() {
             })}
           >
             <CardContent>
-              <Typography variant="h6">Pending Payment</Typography>
+              <Typography variant="h6">Payment Pending</Typography>
               <Typography variant="h4" color="warning.main">
                 {invoiceSummary.pending}
               </Typography>
@@ -335,7 +363,7 @@ export default function AdminDashboard() {
             })}
           >
             <CardContent>
-              <Typography variant="h6">Paid Invoices</Typography>
+              <Typography variant="h6">Payment Received</Typography>
               <Typography variant="h4" color="success.main">
                 {invoiceSummary.paid}
               </Typography>
@@ -343,6 +371,51 @@ export default function AdminDashboard() {
           </Card>
         </Grid>
       </Grid>
+
+      {/* SCADA / PLC Make Counts */}
+      <Card sx={{ mb: 4 }}>
+        <CardContent>
+          <Typography variant="h6" gutterBottom>
+            SCADA / PLC Make — Plant Count
+          </Typography>
+          <Grid container spacing={3}>
+            <Grid item xs={12} md={6}>
+              <Typography variant="subtitle2" color="text.secondary" gutterBottom>
+                SCADA Make
+              </Typography>
+              <Box sx={{ maxHeight: 300, overflowY: "auto" }}>
+                {scadaCounts.length > 0 ? (
+                  scadaCounts.map(([make, count]) => (
+                    <Box key={make} sx={{ display: "flex", justifyContent: "space-between", py: 0.5, borderBottom: 1, borderColor: "divider" }}>
+                      <Typography>{make}</Typography>
+                      <Typography variant="h6">{count}</Typography>
+                    </Box>
+                  ))
+                ) : (
+                  <Typography color="text.secondary">No SCADA make recorded</Typography>
+                )}
+              </Box>
+            </Grid>
+            <Grid item xs={12} md={6}>
+              <Typography variant="subtitle2" color="text.secondary" gutterBottom>
+                PLC Make
+              </Typography>
+              <Box sx={{ maxHeight: 300, overflowY: "auto" }}>
+                {plcCounts.length > 0 ? (
+                  plcCounts.map(([make, count]) => (
+                    <Box key={make} sx={{ display: "flex", justifyContent: "space-between", py: 0.5, borderBottom: 1, borderColor: "divider" }}>
+                      <Typography>{make}</Typography>
+                      <Typography variant="h6">{count}</Typography>
+                    </Box>
+                  ))
+                ) : (
+                  <Typography color="text.secondary">No PLC make recorded</Typography>
+                )}
+              </Box>
+            </Grid>
+          </Grid>
+        </CardContent>
+      </Card>
 
       <Box sx={{ mb: 3, display: "flex", gap: 2, flexWrap: "wrap" }}>
         <Button variant="contained" component={Link} to="/add-amc">
@@ -403,7 +476,7 @@ export default function AdminDashboard() {
         <Table stickyHeader>
           <TableHead>
             <TableRow>
-              {["Plant Name", "Customer", "Total Amount", "Received", "Pending", "Status", "Action"].map((head) => (
+              {["Plant Name", "Customer", "Total Amount", "Received", "Payment Pending", "Status", "Action"].map((head) => (
                 <TableCell
                   key={head}
                   sx={{
@@ -423,11 +496,11 @@ export default function AdminDashboard() {
               const pendingVal  = Number(payment?.pending  || 0);
               const receivedVal = Number(payment?.received || 0);
 
-              let status   = "Pending";
+              let status   = "Payment Pending";
               let rowColor = "#ffebee";
 
               if (pendingVal <= 0) {
-                status   = "Paid";
+                status   = "Payment Received";
                 rowColor = "#e8f5e9";
               } else if (receivedVal > 0) {
                 status   = "Partial";
@@ -445,7 +518,7 @@ export default function AdminDashboard() {
                     <Chip
                       label={status}
                       color={
-                        status === "Paid"    ? "success" :
+                        status === "Payment Received" ? "success" :
                         status === "Partial" ? "warning" : "error"
                       }
                       size="small"

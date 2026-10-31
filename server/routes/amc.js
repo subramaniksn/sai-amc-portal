@@ -68,16 +68,22 @@ router.post("/", verifyToken, isAdmin, async (req, res) => {
       invoice_raise_timing,
       total_amount_without_gst,
       po_number,
-      po_date
+      po_date,
+      scada_make,
+      plc_make
     } = req.body;
 
-    const totalAmount = Number(total_amount_without_gst);
+    const totalAmount = total_amount_without_gst === "" || total_amount_without_gst == null
+      ? null
+      : Number(total_amount_without_gst);
 
     if (!customer_name || !plant_name || !amc_start_date || !amc_end_date) {
       return res.status(400).json({ error: "Customer, plant, start date and end date are required" });
     }
 
-    if (!Number.isFinite(totalAmount) || totalAmount < 0) {
+    // Amount is optional — commercial team may only share the PO initially.
+    // If provided, it must be a valid non-negative number.
+    if (totalAmount !== null && (!Number.isFinite(totalAmount) || totalAmount < 0)) {
       return res.status(400).json({ error: "Total amount must be a valid non-negative number" });
     }
 
@@ -123,9 +129,11 @@ router.post("/", verifyToken, isAdmin, async (req, res) => {
         site_visit,
         invoice_raise_timing,
         total_amount_without_gst,
-        balance_amount_without_gst
+        balance_amount_without_gst,
+        scada_make,
+        plc_make
       )
-      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
+      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)
       RETURNING *
     `, [
       customer_name,
@@ -140,7 +148,9 @@ router.post("/", verifyToken, isAdmin, async (req, res) => {
       site_visit,
       invoice_raise_timing,
       totalAmount,
-      totalAmount
+      totalAmount,
+      scada_make || null,
+      plc_make || null
     ]);
 
     const amcId = amc.rows[0].id;
@@ -458,6 +468,8 @@ router.get("/export", verifyToken, async (req, res) => {
       SELECT
         a.customer_name,
         a.plant_name,
+        a.scada_make,
+        a.plc_make,
         MAX(i.po_number) AS po_number,
         TO_CHAR(MAX(i.po_date), 'DD-MM-YYYY') AS po_date,
         TO_CHAR(a.amc_start_date, 'DD-MM-YYYY') AS amc_start_date,
@@ -500,6 +512,8 @@ router.get("/export", verifyToken, async (req, res) => {
         a.id,
         a.customer_name,
         a.plant_name,
+        a.scada_make,
+        a.plc_make,
         a.amc_start_date,
         a.amc_end_date
       ORDER BY a.customer_name
@@ -513,6 +527,8 @@ router.get("/export", verifyToken, async (req, res) => {
     sheet.columns = [
       { header: "Customer Name",   key: "customer_name",   width: 25 },
       { header: "Plant Name",      key: "plant_name",      width: 25 },
+      { header: "SCADA Make",      key: "scada_make",      width: 20 },
+      { header: "PLC Make",        key: "plc_make",        width: 18 },
       { header: "PO Number",       key: "po_number",       width: 20 },
       { header: "PO Date",         key: "po_date",         width: 18 },
       { header: "AMC Start Date",  key: "amc_start_date",  width: 18 },
@@ -648,6 +664,109 @@ router.get("/:id", verifyToken, async (req, res) => {
   } catch (err) {
     console.error("GET AMC ERROR:", err);
     res.status(500).json({ error: err.message });
+  }
+
+});
+
+
+// ========================================
+// UPDATE EXISTING AMC (SCADA / PLC make etc.)
+// ========================================
+router.put("/:id", verifyToken, isAdmin, async (req, res) => {
+
+  const client = await pool.connect();
+
+  try {
+
+    const id = parseInt(req.params.id, 10);
+    if (isNaN(id)) {
+      return res.status(400).json({ error: `Invalid ID: ${req.params.id}` });
+    }
+
+    const {
+      customer_name,
+      plant_name,
+      billing_address,
+      contact_person,
+      plantcapacity_mw,
+      amc_start_date,
+      amc_end_date,
+      supporting_document_for_invoice,
+      billing_cycle,
+      site_visit,
+      invoice_raise_timing,
+      total_amount_without_gst,
+      po_number,
+      po_date,
+      scada_make,
+      plc_make
+    } = req.body;
+
+    const totalAmount = total_amount_without_gst === "" || total_amount_without_gst == null
+      ? null
+      : Number(total_amount_without_gst);
+
+    if (totalAmount !== null && (!Number.isFinite(totalAmount) || totalAmount < 0)) {
+      return res.status(400).json({ error: "Total amount must be a valid non-negative number" });
+    }
+
+    const existing = await client.query(
+      "SELECT id FROM amc_site_entry WHERE id = $1",
+      [id]
+    );
+
+    if (existing.rows.length === 0) {
+      await client.query("ROLLBACK");
+      return res.status(404).json({ message: "AMC not found" });
+    }
+
+    await client.query(`
+      UPDATE amc_site_entry
+      SET
+        customer_name = COALESCE($2, customer_name),
+        plant_name = COALESCE($3, plant_name),
+        billing_address = COALESCE($4, billing_address),
+        contact_person = COALESCE($5, contact_person),
+        plantcapacity_mw = COALESCE($6, plantcapacity_mw),
+        amc_start_date = COALESCE($7, amc_start_date),
+        amc_end_date = COALESCE($8, amc_end_date),
+        supporting_document_for_invoice = COALESCE($9, supporting_document_for_invoice),
+        billing_cycle = COALESCE($10, billing_cycle),
+        site_visit = COALESCE($11, site_visit),
+        invoice_raise_timing = COALESCE($12, invoice_raise_timing),
+        total_amount_without_gst = COALESCE($13, total_amount_without_gst),
+        balance_amount_without_gst = COALESCE($13, balance_amount_without_gst),
+        scada_make = COALESCE($14, scada_make),
+        plc_make = COALESCE($15, plc_make)
+      WHERE id = $1
+      RETURNING *
+    `, [
+      id,
+      customer_name,
+      plant_name,
+      billing_address,
+      contact_person,
+      plantcapacity_mw === "" ? null : plantcapacity_mw,
+      amc_start_date,
+      amc_end_date,
+      supporting_document_for_invoice,
+      billing_cycle,
+      site_visit,
+      invoice_raise_timing,
+      totalAmount,
+      scada_make === "" ? null : scada_make,
+      plc_make === "" ? null : plc_make
+    ]);
+
+    await client.query("COMMIT");
+    res.json({ message: "AMC updated successfully" });
+
+  } catch (err) {
+    await client.query("ROLLBACK");
+    console.error("UPDATE AMC ERROR:", err);
+    res.status(500).json({ error: "Unable to update AMC" });
+  } finally {
+    client.release();
   }
 
 });

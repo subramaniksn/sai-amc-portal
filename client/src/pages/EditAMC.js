@@ -28,6 +28,8 @@ export default function EditAMC() {
   const [schedule, setSchedule] = useState([]);
   const [message, setMessage] = useState({ open: false, severity: "success", text: "" });
   const [savingId, setSavingId] = useState(null);
+  const [savingAmc, setSavingAmc] = useState(false);
+  const [amcEdit, setAmcEdit] = useState({ scada_make: "", plc_make: "" });
 
   const formatAmount = (amount) => new Intl.NumberFormat("en-IN", {
     style: "currency",
@@ -36,7 +38,7 @@ export default function EditAMC() {
   }).format(Number(amount || 0));
 
   const getStatus = (row) => {
-    if (row.payment_received) return { label: "Paid", color: "success" };
+    if (row.payment_received) return { label: "Payment Received", color: "success" };
     if (row.invoice_raised || row.invoice_number) return { label: "Payment Pending", color: "warning" };
     return { label: "Not Raised", color: "default" };
   };
@@ -48,6 +50,10 @@ export default function EditAMC() {
 
         const amcRes = await api.get(`/amc/${id}`);
         setAmc(amcRes.data);
+        setAmcEdit({
+          scada_make: amcRes.data.scada_make || "",
+          plc_make: amcRes.data.plc_make || ""
+        });
 
         const scheduleRes = await api.get(`/amc/schedule/${id}`);
         setSchedule(scheduleRes.data.map((row) => ({
@@ -136,6 +142,30 @@ export default function EditAMC() {
     }
   };
 
+  const saveAmcInfo = async () => {
+    try {
+      setSavingAmc(true);
+      await api.put(`/amc/${id}`, {
+        scada_make: amcEdit.scada_make || null,
+        plc_make: amcEdit.plc_make || null
+      });
+      setAmc((current) => ({
+        ...current,
+        scada_make: amcEdit.scada_make || null,
+        plc_make: amcEdit.plc_make || null
+      }));
+      setMessage({ open: true, severity: "success", text: "SCADA / PLC make updated successfully" });
+    } catch (err) {
+      setMessage({
+        open: true,
+        severity: "error",
+        text: err.response?.data?.error || err.message || "Unable to update SCADA / PLC make"
+      });
+    } finally {
+      setSavingAmc(false);
+    }
+  };
+
   return (
 
     <Container maxWidth="lg">
@@ -164,6 +194,38 @@ export default function EditAMC() {
           <Typography>
             Total AMC Amount: ₹ {amc.total_amount_without_gst}
           </Typography>
+
+          <Grid container spacing={2} sx={{ mt: 2 }}>
+            <Grid item xs={12} md={6}>
+              <TextField
+                fullWidth
+                label="SCADA Make"
+                value={amcEdit.scada_make}
+                onChange={(e) => setAmcEdit({ ...amcEdit, scada_make: e.target.value })}
+                disabled={savingAmc}
+              />
+            </Grid>
+            <Grid item xs={12} md={6}>
+              <TextField
+                fullWidth
+                label="PLC Make"
+                value={amcEdit.plc_make}
+                onChange={(e) => setAmcEdit({ ...amcEdit, plc_make: e.target.value })}
+                disabled={savingAmc}
+              />
+            </Grid>
+            <Grid item xs={12}>
+              <Button
+                variant="contained"
+                onClick={saveAmcInfo}
+                disabled={savingAmc}
+                fullWidth
+                sx={{ mt: 1 }}
+              >
+                {savingAmc ? "Updating..." : "Save SCADA / PLC Make"}
+              </Button>
+            </Grid>
+          </Grid>
 
         </CardContent>
       </Card>
@@ -274,7 +336,7 @@ export default function EditAMC() {
 
               <Grid item xs={1}>
                 <Typography variant="caption">
-                  Paid
+                  Payment Received
                 </Typography>
                 <Checkbox
                   checked={row.payment_received || false}

@@ -73,18 +73,6 @@ export default function InvoiceList() {
     return "#ffffff";
   };
 
-  const formatAmount = (amount) => {
-    const value = Number(amount);
-    if (!Number.isFinite(value)) return "₹0.00";
-
-    return new Intl.NumberFormat("en-IN", {
-      style: "currency",
-      currency: "INR",
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2
-    }).format(value);
-  };
-
   // =========================
   // TITLE LABEL
   // =========================
@@ -149,7 +137,7 @@ export default function InvoiceList() {
             {/* HEADER */}
             <TableHead>
               <TableRow>
-                {["Plant Name", "Customer", "PO Number", "Invoice Number", "Quarter", "Quarter Amount", "Due Date", "Status"].map((head) => (
+                {["Plant Name", "Customer", "PO Number", "Invoice Number", "Quarter", "Due Date", "Status"].map((head) => (
                   <TableCell
                     key={head}
                     sx={{
@@ -180,7 +168,6 @@ export default function InvoiceList() {
                   <TableCell>{d.po_number}</TableCell>
                   <TableCell>{d.invoice_number || "N/A"}</TableCell>
                   <TableCell>Q{d.period_number}</TableCell>
-                  <TableCell>{formatAmount(d.quarter_amount)}</TableCell>
                   <TableCell>{formatDate(d.due_date)}</TableCell>
                   <TableCell sx={{ fontWeight: "bold" }}>
                     {d.invoice_status}

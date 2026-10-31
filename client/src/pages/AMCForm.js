@@ -37,7 +37,11 @@ export default function AMCForm() {
     invoice_raise_timing: "",
     total_amount_without_gst: "",
     po_no: "",
-    po_date: ""
+    po_date: "",
+    scada_make: "",
+    scada_make_other: "",
+    plc_make: "",
+    plc_make_other: ""
   });
 
   const handleChange = (e) => {
@@ -64,8 +68,7 @@ export default function AMCForm() {
       "amc_start_date",
       "amc_end_date",
       "billing_cycle",
-      "invoice_raise_timing",
-      "total_amount_without_gst"
+      "invoice_raise_timing"
     ];
 
     if (requiredFields.some((field) => !String(form[field] || "").trim())) {
@@ -78,8 +81,17 @@ export default function AMCForm() {
       return;
     }
 
-    if (Number(form.total_amount_without_gst) < 0 || Number(form.plantcapacity_mw) < 0) {
-      setMessage({ open: true, severity: "error", text: "Capacity and amount cannot be negative" });
+    // Amount is optional. If provided, it must not be negative.
+    const amountValue = Number(form.total_amount_without_gst);
+    if (form.total_amount_without_gst !== "" && form.total_amount_without_gst != null) {
+      if (!Number.isFinite(amountValue) || amountValue < 0) {
+        setMessage({ open: true, severity: "error", text: "Amount cannot be negative" });
+        return;
+      }
+    }
+
+    if (Number(form.plantcapacity_mw) < 0) {
+      setMessage({ open: true, severity: "error", text: "Capacity cannot be negative" });
       return;
     }
 
@@ -90,16 +102,20 @@ export default function AMCForm() {
       plant_name: form.plant_name,
       billing_address: form.billing_address,
       contact_person: form.contact_person,
-      plantcapacity_mw: Number(form.plantcapacity_mw),
+      plantcapacity_mw: form.plantcapacity_mw === "" ? null : Number(form.plantcapacity_mw),
       amc_start_date: form.amc_start_date,
       amc_end_date: form.amc_end_date,
       supporting_document_for_invoice: form.supporting_document_for_invoice,
       billing_cycle: form.billing_cycle,
       site_visit: form.site_visit,
       invoice_raise_timing: form.invoice_raise_timing,
-      total_amount_without_gst: Number(form.total_amount_without_gst),
+      total_amount_without_gst: form.total_amount_without_gst === "" || form.total_amount_without_gst == null
+        ? null
+        : Number(form.total_amount_without_gst),
       po_number: form.po_no,
-      po_date: form.po_date || null
+      po_date: form.po_date || null,
+      scada_make: form.scada_make === "Other" ? form.scada_make_other : form.scada_make || null,
+      plc_make: form.plc_make === "Other" ? form.plc_make_other : form.plc_make || null
     };
 
     // Create AMC
@@ -164,7 +180,7 @@ export default function AMCForm() {
                   InputLabelProps={field.type === "date" ? { shrink: true } : {}}
                   value={form[field.key]}
                   onChange={handleChange}
-                  required={["customer_name", "plant_name", "amc_start_date", "amc_end_date", "total_amount_without_gst"].includes(field.key)}
+                  required={["customer_name", "plant_name", "amc_start_date", "amc_end_date"].includes(field.key)}
                 />
 
               </Grid>
@@ -225,6 +241,71 @@ export default function AMCForm() {
 
               </FormControl>
 
+            </Grid>
+
+            {/* SCADA Make */}
+            <Grid size={{ xs: 12, md: 6 }}>
+              <FormControl fullWidth>
+                <InputLabel>SCADA Make</InputLabel>
+                <Select
+                  name="scada_make"
+                  value={form.scada_make}
+                  onChange={(e) => {
+                    setForm({ ...form, scada_make: e.target.value, scada_make_other: e.target.value === "Other" ? form.scada_make_other : "" });
+                  }}
+                >
+                  <MenuItem value=""><em>Select</em></MenuItem>
+                  <MenuItem value="Schneider Electric">Schneider Electric</MenuItem>
+                  <MenuItem value="Siemens">Siemens</MenuItem>
+                  <MenuItem value="ABB">ABB</MenuItem>
+                  <MenuItem value="Mitsubishi">Mitsubishi</MenuItem>
+                  <MenuItem value="Delta">Delta</MenuItem>
+                  <MenuItem value="Other">Other</MenuItem>
+                </Select>
+              </FormControl>
+              {form.scada_make === "Other" && (
+                <TextField
+                  fullWidth
+                  label="Specify SCADA Make"
+                  name="scada_make_other"
+                  value={form.scada_make_other}
+                  onChange={handleChange}
+                  margin="dense"
+                />
+              )}
+            </Grid>
+
+            {/* PLC Make */}
+            <Grid size={{ xs: 12, md: 6 }}>
+              <FormControl fullWidth>
+                <InputLabel>PLC Make</InputLabel>
+                <Select
+                  name="plc_make"
+                  value={form.plc_make}
+                  onChange={(e) => {
+                    setForm({ ...form, plc_make: e.target.value, plc_make_other: e.target.value === "Other" ? form.plc_make_other : "" });
+                  }}
+                >
+                  <MenuItem value=""><em>Select</em></MenuItem>
+                  <MenuItem value="Siemens">Siemens</MenuItem>
+                  <MenuItem value="Schneider Electric">Schneider Electric</MenuItem>
+                  <MenuItem value="ABB">ABB</MenuItem>
+                  <MenuItem value="Mitsubishi">Mitsubishi</MenuItem>
+                  <MenuItem value="Omron">Omron</MenuItem>
+                  <MenuItem value="Allen-Bradley">Allen-Bradley</MenuItem>
+                  <MenuItem value="Other">Other</MenuItem>
+                </Select>
+              </FormControl>
+              {form.plc_make === "Other" && (
+                <TextField
+                  fullWidth
+                  label="Specify PLC Make"
+                  name="plc_make_other"
+                  value={form.plc_make_other}
+                  onChange={handleChange}
+                  margin="dense"
+                />
+              )}
             </Grid>
 
           </Grid>

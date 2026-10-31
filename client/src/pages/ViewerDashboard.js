@@ -126,11 +126,25 @@ export default function ViewerDashboard() {
   };
 
   // TOTAL COUNTS
-  const totalSites     = sites.length;
-  const totalCustomers = [...new Set(sites.map(s => s.customer_name))].length;
-  const totalMW        = sites.reduce((sum, s) => sum + parseFloat(s.plantcapacity_mw || 0), 0);
+  // Count distinct plants (sites) per customer so a multi-year AMC is not
+  // counted once per year. E.g. 2 sites × 5 years should show 2 sites, not 10.
+  const distinctSites = (arr) => {
+    const seen = new Set();
+    return arr.filter((s) => {
+      const key = s.plant_name || "";
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+  };
 
-  // GROUP FOR CHART
+  const totalSites     = distinctSites(sites).length;
+  const totalCustomers = [...new Set(sites.map(s => s.customer_name))].length;
+  const totalMW        = distinctSites(sites).reduce(
+    (sum, s) => sum + parseFloat(s.plantcapacity_mw || 0), 0
+  );
+
+  // GROUP FOR CHART — count distinct plants per customer
   const grouped = filteredSites.reduce((acc, site) => {
     const customer = site.customer_name || "Unknown";
     if (!acc[customer]) acc[customer] = [];
@@ -138,11 +152,14 @@ export default function ViewerDashboard() {
     return acc;
   }, {});
 
-  const chartData = Object.entries(grouped).map(([customer, customerSites]) => ({
-    customer,
-    sites: customerSites.length,
-    mw: customerSites.reduce((sum, s) => sum + parseFloat(s.plantcapacity_mw || 0), 0)
-  }));
+  const chartData = Object.entries(grouped).map(([customer, customerSites]) => {
+    const unique = distinctSites(customerSites);
+    return {
+      customer,
+      sites: unique.length,
+      mw: unique.reduce((sum, s) => sum + parseFloat(s.plantcapacity_mw || 0), 0)
+    };
+  });
 
   // FILTER
   const applyFilter = () => {
@@ -170,7 +187,9 @@ export default function ViewerDashboard() {
   // CHART CLICK
   const handleBarClick = (data) => {
     if (!data || !data.customer) return;
-    const sitesOfCustomer = filteredSites.filter(s => s.customer_name === data.customer);
+    const sitesOfCustomer = distinctSites(
+      filteredSites.filter(s => s.customer_name === data.customer)
+    );
     setSelectedCustomer({ name: data.customer, sites: sitesOfCustomer });
   };
 
@@ -300,7 +319,7 @@ export default function ViewerDashboard() {
               state: { year: currentYear, status: amcStatus }  // ✅ pass status
             })}
           >
-            <Typography variant="h6">Due</Typography>
+            <Typography variant="h6">Invoice Due</Typography>
             <Typography variant="h4" color="error">
               {invoiceSummary.due}
             </Typography>
@@ -314,7 +333,7 @@ export default function ViewerDashboard() {
               state: { year: currentYear, status: amcStatus }  // ✅ pass status
             })}
           >
-            <Typography variant="h6">Pending</Typography>
+            <Typography variant="h6">Payment Pending</Typography>
             <Typography variant="h4" color="warning.main">
               {invoiceSummary.pending}
             </Typography>
@@ -328,7 +347,7 @@ export default function ViewerDashboard() {
               state: { year: currentYear, status: amcStatus }  // ✅ pass status
             })}
           >
-            <Typography variant="h6">Paid</Typography>
+            <Typography variant="h6">Payment Received</Typography>
             <Typography variant="h4" color="success.main">
               {invoiceSummary.paid}
             </Typography>
@@ -426,6 +445,8 @@ export default function ViewerDashboard() {
                 <TableRow>
                   <TableCell>Plant Name</TableCell>
                   <TableCell align="center">MW</TableCell>
+                  <TableCell>SCADA Make</TableCell>
+                  <TableCell>PLC Make</TableCell>
                   <TableCell>Billing Address</TableCell>
                   <TableCell>Contact Person</TableCell>
                   <TableCell align="center">PO No</TableCell>
@@ -441,6 +462,8 @@ export default function ViewerDashboard() {
                   <TableRow key={site.id}>
                     <TableCell>{site.plant_name}</TableCell>
                     <TableCell align="center">{site.plantcapacity_mw || "0"}</TableCell>
+                    <TableCell>{site.scada_make || "N/A"}</TableCell>
+                    <TableCell>{site.plc_make || "N/A"}</TableCell>
                     <TableCell>{site.billing_address?.split(",")[0] || "N/A"}</TableCell>
                     <TableCell>{site.contact_person || "N/A"}</TableCell>
                     <TableCell align="center">{site.po_number || "N/A"}</TableCell>

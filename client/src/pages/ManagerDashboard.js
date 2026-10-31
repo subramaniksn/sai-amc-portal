@@ -116,11 +116,42 @@ export default function ManagerDashboard() {
   };
 
   // TOTAL COUNTS
-  const totalSites     = sites.length;
-  const totalCustomers = [...new Set(sites.map(s => s.customer_name))].length;
-  const totalMW        = sites.reduce((sum, s) => sum + parseFloat(s.plantcapacity_mw || 0), 0);
+  // Count distinct plants (sites) per customer so a multi-year AMC is not
+  // counted once per year. E.g. 2 sites × 5 years should show 2 sites, not 10.
+  const distinctSites = (arr) => {
+    const seen = new Set();
+    return arr.filter((s) => {
+      const key = s.plant_name || "";
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+  };
 
-  // GROUP DATA FOR CHART
+  const totalSites     = distinctSites(sites).length;
+  const totalCustomers = [...new Set(sites.map(s => s.customer_name))].length;
+  const totalMW        = distinctSites(sites).reduce(
+    (sum, s) => sum + parseFloat(s.plantcapacity_mw || 0), 0
+  );
+
+  // SCADA / PLC make counts (distinct plants per make)
+  const scadaCounts = Object.entries(
+    distinctSites(sites).reduce((acc, s) => {
+      const make = s.scada_make || "Not Specified";
+      acc[make] = (acc[make] || 0) + 1;
+      return acc;
+    }, {})
+  ).sort((a, b) => b[1] - a[1]);
+
+  const plcCounts = Object.entries(
+    distinctSites(sites).reduce((acc, s) => {
+      const make = s.plc_make || "Not Specified";
+      acc[make] = (acc[make] || 0) + 1;
+      return acc;
+    }, {})
+  ).sort((a, b) => b[1] - a[1]);
+
+  // GROUP DATA FOR CHART — count distinct plants per customer
   const grouped = filteredSites.reduce((acc, site) => {
     const customer = site.customer_name || "Unknown";
     if (!acc[customer]) acc[customer] = [];
@@ -129,10 +160,11 @@ export default function ManagerDashboard() {
   }, {});
 
   const chartData = Object.entries(grouped).map(([customer, customerSites]) => {
-    const totalMW = customerSites.reduce(
+    const unique = distinctSites(customerSites);
+    const totalMW = unique.reduce(
       (sum, s) => sum + parseFloat(s.plantcapacity_mw || 0), 0
     );
-    return { customer, sites: customerSites.length, mw: totalMW };
+    return { customer, sites: unique.length, mw: totalMW };
   });
 
   // FILTER
@@ -166,8 +198,8 @@ export default function ManagerDashboard() {
   const handleBarClick = (data) => {
     if (!data || !data.customer) return;
     const customer = data.customer;
-    const sitesOfCustomer = filteredSites.filter(
-      (s) => s.customer_name === customer
+    const sitesOfCustomer = distinctSites(
+      filteredSites.filter((s) => s.customer_name === customer)
     );
     setSelectedCustomer({ name: customer, sites: sitesOfCustomer });
   };
@@ -286,6 +318,49 @@ export default function ManagerDashboard() {
         </Grid>
       </Grid>
 
+      {/* SCADA / PLC Make Counts */}
+      <Card sx={{ p: 3, mb: 4 }}>
+        <Typography variant="h6" gutterBottom>
+          SCADA / PLC Make — Plant Count
+        </Typography>
+        <Grid container spacing={3}>
+          <Grid item xs={12} md={6}>
+            <Typography variant="subtitle2" color="text.secondary" gutterBottom>
+              SCADA Make
+            </Typography>
+            <Box sx={{ maxHeight: 300, overflowY: "auto" }}>
+              {scadaCounts.length > 0 ? (
+                scadaCounts.map(([make, count]) => (
+                  <Box key={make} sx={{ display: "flex", justifyContent: "space-between", py: 0.5, borderBottom: 1, borderColor: "divider" }}>
+                    <Typography>{make}</Typography>
+                    <Typography variant="h6">{count}</Typography>
+                  </Box>
+                ))
+              ) : (
+                <Typography color="text.secondary">No SCADA make recorded</Typography>
+              )}
+            </Box>
+          </Grid>
+          <Grid item xs={12} md={6}>
+            <Typography variant="subtitle2" color="text.secondary" gutterBottom>
+              PLC Make
+            </Typography>
+            <Box sx={{ maxHeight: 300, overflowY: "auto" }}>
+              {plcCounts.length > 0 ? (
+                plcCounts.map(([make, count]) => (
+                  <Box key={make} sx={{ display: "flex", justifyContent: "space-between", py: 0.5, borderBottom: 1, borderColor: "divider" }}>
+                    <Typography>{make}</Typography>
+                    <Typography variant="h6">{count}</Typography>
+                  </Box>
+                ))
+              ) : (
+                <Typography color="text.secondary">No PLC make recorded</Typography>
+              )}
+            </Box>
+          </Grid>
+        </Grid>
+      </Card>
+
       {/* FILTER */}
       <Card sx={{ p: 3, mb: 4 }}>
         <Grid container spacing={2}>
@@ -371,6 +446,8 @@ export default function ManagerDashboard() {
                 <TableRow>
                   <TableCell>Plant Name</TableCell>
                   <TableCell align="center">MW</TableCell>
+                  <TableCell>SCADA Make</TableCell>
+                  <TableCell>PLC Make</TableCell>
                   <TableCell>Billing Address</TableCell>
                   <TableCell>Contact Person</TableCell>
                   <TableCell align="center">PO No</TableCell>
@@ -386,6 +463,8 @@ export default function ManagerDashboard() {
                   <TableRow key={site.id}>
                     <TableCell>{site.plant_name}</TableCell>
                     <TableCell align="center">{site.plantcapacity_mw || "0"}</TableCell>
+                    <TableCell>{site.scada_make || "N/A"}</TableCell>
+                    <TableCell>{site.plc_make || "N/A"}</TableCell>
                     <TableCell>{site.billing_address?.split(",")[0] || "N/A"}</TableCell>
                     <TableCell>{site.contact_person || "N/A"}</TableCell>
                     <TableCell align="center">{site.po_number || "N/A"}</TableCell>
