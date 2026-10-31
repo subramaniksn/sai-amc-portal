@@ -23,6 +23,7 @@ import {
   TableContainer,
   Paper
 } from "@mui/material";
+import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import {
   BarChart,
   Bar,
@@ -44,6 +45,8 @@ export default function AdminDashboard() {
   const [period, setPeriod] = useState("all");
   const [activeAmountSeries, setActiveAmountSeries] = useState("all");
   const [showChart, setShowChart] = useState(false);
+  const [selectedMake, setSelectedMake] = useState(null);
+  const [makeType, setMakeType] = useState(null); // 'scada' | 'plc'
 
   const navigate = useNavigate();
   const user = JSON.parse(localStorage.getItem("user") || "{}");
@@ -186,6 +189,23 @@ export default function AdminDashboard() {
       return acc;
     }, {})
   ).sort((a, b) => b[1] - a[1]);
+
+  // Sites for selected make (click a make in the counts below to view its sites)
+  const makeSites = selectedMake
+    ? distinctSites(data).filter((s) => {
+        const field = makeType === "scada" ? "scada_make" : "plc_make";
+        const makes = (s[field] || "")
+          .split(",")
+          .map((m) => m.trim())
+          .filter(Boolean);
+        return makes.includes(selectedMake);
+      })
+    : [];
+
+  const handleMakeClick = (make, type) => {
+    setSelectedMake(make);
+    setMakeType(type);
+  };
 
   const formatCurrency = (num) =>
     new Intl.NumberFormat("en-IN").format(num || 0);
@@ -397,6 +417,23 @@ export default function AdminDashboard() {
           <Typography variant="h6" gutterBottom>
             SCADA / PLC Make — Plant Count
           </Typography>
+          {selectedMake && (
+            <Box sx={{ mb: 2 }}>
+              <Button
+                variant="text"
+                onClick={() => {
+                  setSelectedMake(null);
+                  setMakeType(null);
+                }}
+                startIcon={<ArrowBackIcon />}
+              >
+                Back to all makes
+              </Button>
+              <Typography variant="subtitle2" color="text.secondary" sx={{ ml: 2, display: "inline-block" }}>
+                Sites using {makeType === "scada" ? "SCADA" : "PLC"} make: <b>{selectedMake}</b>
+              </Typography>
+            </Box>
+          )}
           <Grid container spacing={3}>
             <Grid item xs={12} md={6}>
               <Typography variant="subtitle2" color="text.secondary" gutterBottom>
@@ -405,8 +442,30 @@ export default function AdminDashboard() {
               <Box sx={{ maxHeight: 300, overflowY: "auto" }}>
                 {scadaCounts.length > 0 ? (
                   scadaCounts.map(([make, count]) => (
-                    <Box key={make} sx={{ display: "flex", justifyContent: "space-between", py: 0.5, borderBottom: 1, borderColor: "divider" }}>
-                      <Typography>{make}</Typography>
+                    <Box
+                      key={make}
+                      sx={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                        py: 1,
+                        borderBottom: 1,
+                        borderColor: "divider",
+                        cursor: selectedMake === make && makeType === "scada" ? "default" : "pointer",
+                      }}
+                      onClick={() => handleMakeClick(make, "scada")}
+                    >
+                      <Typography
+                        color={
+                          selectedMake === make && makeType === "scada"
+                            ? "primary"
+                            : "text.secondary"
+                        }
+                        fontWeight={
+                          selectedMake === make && makeType === "scada" ? "bold" : "normal"
+                        }
+                      >
+                        {make}
+                      </Typography>
                       <Typography variant="h6">{count}</Typography>
                     </Box>
                   ))
@@ -422,8 +481,30 @@ export default function AdminDashboard() {
               <Box sx={{ maxHeight: 300, overflowY: "auto" }}>
                 {plcCounts.length > 0 ? (
                   plcCounts.map(([make, count]) => (
-                    <Box key={make} sx={{ display: "flex", justifyContent: "space-between", py: 0.5, borderBottom: 1, borderColor: "divider" }}>
-                      <Typography>{make}</Typography>
+                    <Box
+                      key={make}
+                      sx={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                        py: 1,
+                        borderBottom: 1,
+                        borderColor: "divider",
+                        cursor: selectedMake === make && makeType === "plc" ? "default" : "pointer",
+                      }}
+                      onClick={() => handleMakeClick(make, "plc")}
+                    >
+                      <Typography
+                        color={
+                          selectedMake === make && makeType === "plc"
+                            ? "primary"
+                            : "text.secondary"
+                        }
+                        fontWeight={
+                          selectedMake === make && makeType === "plc" ? "bold" : "normal"
+                        }
+                      >
+                        {make}
+                      </Typography>
                       <Typography variant="h6">{count}</Typography>
                     </Box>
                   ))
@@ -435,6 +516,59 @@ export default function AdminDashboard() {
           </Grid>
         </CardContent>
       </Card>
+
+      {/* Sites for selected make */}
+      {selectedMake && makeSites.length > 0 && (
+        <Card sx={{ mb: 4 }}>
+          <CardContent>
+            <Typography variant="h6" gutterBottom>
+              Sites — {makeType === "scada" ? "SCADA" : "PLC"} Make: {selectedMake}
+            </Typography>
+            <TableContainer component={Paper}>
+              <Table stickyHeader>
+                <TableHead>
+                  <TableRow>
+                    {["Plant Name", "Customer", "SCADA Make", "PLC Make", "AMC Start", "AMC End", "PO Number"].map(
+                      (head) => (
+                        <TableCell
+                          key={head}
+                          sx={{
+                            backgroundColor: "#1976d2 !important",
+                            color: "#fff !important",
+                            fontWeight: "bold",
+                          }}
+                        >
+                          {head}
+                        </TableCell>
+                      )
+                    )}
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {makeSites.map((s) => (
+                    <TableRow key={s.id} sx={{ cursor: "pointer" }}>
+                      <TableCell>{s.plant_name}</TableCell>
+                      <TableCell>{s.customer_name}</TableCell>
+                      <TableCell>{s.scada_make || "N/A"}</TableCell>
+                      <TableCell>{s.plc_make || "N/A"}</TableCell>
+                      <TableCell>
+                        {s.amc_start_date ? new Date(s.amc_start_date).toLocaleDateString("en-IN") : "N/A"}
+                      </TableCell>
+                      <TableCell>
+                        {s.amc_end_date ? new Date(s.amc_end_date).toLocaleDateString("en-IN") : "N/A"}
+                      </TableCell>
+                      <TableCell>{s.po_number || "N/A"}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </TableContainer>
+            {makeSites.length === 0 && (
+              <Typography color="text.secondary">No sites found for this make.</Typography>
+            )}
+          </CardContent>
+        </Card>
+      )}
 
       <Box sx={{ mb: 3, display: "flex", gap: 2, flexWrap: "wrap" }}>
         <Button variant="contained" component={Link} to="/add-amc">
