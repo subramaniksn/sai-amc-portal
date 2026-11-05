@@ -24,6 +24,7 @@ import {
   Paper
 } from "@mui/material";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
+import CheckCircleIcon from "@mui/icons-material/CheckCircle";
 import {
   BarChart,
   Bar,
@@ -439,79 +440,79 @@ export default function AdminDashboard() {
               <Typography variant="subtitle2" color="text.secondary" gutterBottom>
                 SCADA Make
               </Typography>
-              <Box sx={{ maxHeight: 300, overflowY: "auto" }}>
+              <Grid container spacing={1}>
                 {scadaCounts.length > 0 ? (
                   scadaCounts.map(([make, count]) => (
-                    <Box
-                      key={make}
-                      sx={{
-                        display: "flex",
-                        justifyContent: "space-between",
-                        py: 1,
-                        borderBottom: 1,
-                        borderColor: "divider",
-                        cursor: selectedMake === make && makeType === "scada" ? "default" : "pointer",
-                      }}
-                      onClick={() => handleMakeClick(make, "scada")}
-                    >
-                      <Typography
+                    <Grid item key={make} xs={12} sm={6}>
+                      <Button
+                        variant="contained"
+                        fullWidth
+                        startIcon={
+                          selectedMake === make && makeType === "scada" ? <CheckCircleIcon /> : undefined
+                        }
                         color={
                           selectedMake === make && makeType === "scada"
                             ? "primary"
-                            : "text.secondary"
+                            : "default"
                         }
-                        fontWeight={
-                          selectedMake === make && makeType === "scada" ? "bold" : "normal"
-                        }
+                        onClick={() => handleMakeClick(make, "scada")}
+                        sx={{
+                          height: 48,
+                          justifyContent: "space-between",
+                          fontWeight:
+                            selectedMake === make && makeType === "scada"
+                              ? "bold"
+                              : "normal",
+                        }}
                       >
                         {make}
-                      </Typography>
-                      <Typography variant="h6">{count}</Typography>
-                    </Box>
+                        <Box sx={{ ml: 1 }}>{count}</Box>
+                      </Button>
+                    </Grid>
                   ))
                 ) : (
                   <Typography color="text.secondary">No SCADA make recorded</Typography>
                 )}
-              </Box>
+              </Grid>
             </Grid>
             <Grid item xs={12} md={6}>
               <Typography variant="subtitle2" color="text.secondary" gutterBottom>
                 PLC Make
               </Typography>
-              <Box sx={{ maxHeight: 300, overflowY: "auto" }}>
+              <Grid container spacing={1}>
                 {plcCounts.length > 0 ? (
                   plcCounts.map(([make, count]) => (
-                    <Box
-                      key={make}
-                      sx={{
-                        display: "flex",
-                        justifyContent: "space-between",
-                        py: 1,
-                        borderBottom: 1,
-                        borderColor: "divider",
-                        cursor: selectedMake === make && makeType === "plc" ? "default" : "pointer",
-                      }}
-                      onClick={() => handleMakeClick(make, "plc")}
-                    >
-                      <Typography
+                    <Grid item key={make} xs={12} sm={6}>
+                      <Button
+                        variant="contained"
+                        fullWidth
+                        startIcon={
+                          selectedMake === make && makeType === "plc" ? <CheckCircleIcon /> : undefined
+                        }
                         color={
                           selectedMake === make && makeType === "plc"
                             ? "primary"
-                            : "text.secondary"
+                            : "default"
                         }
-                        fontWeight={
-                          selectedMake === make && makeType === "plc" ? "bold" : "normal"
-                        }
+                        onClick={() => handleMakeClick(make, "plc")}
+                        sx={{
+                          height: 48,
+                          justifyContent: "space-between",
+                          fontWeight:
+                            selectedMake === make && makeType === "plc"
+                              ? "bold"
+                              : "normal",
+                        }}
                       >
                         {make}
-                      </Typography>
-                      <Typography variant="h6">{count}</Typography>
-                    </Box>
+                        <Box sx={{ ml: 1 }}>{count}</Box>
+                      </Button>
+                    </Grid>
                   ))
                 ) : (
                   <Typography color="text.secondary">No PLC make recorded</Typography>
                 )}
-              </Box>
+              </Grid>
             </Grid>
           </Grid>
         </CardContent>
