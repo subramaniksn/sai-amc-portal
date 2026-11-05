@@ -29,7 +29,7 @@ export default function EditAMC() {
   const [message, setMessage] = useState({ open: false, severity: "success", text: "" });
   const [savingId, setSavingId] = useState(null);
   const [savingAmc, setSavingAmc] = useState(false);
-  const [amcEdit, setAmcEdit] = useState({ scada_make: "", plc_make: "" });
+  const [amcEdit, setAmcEdit] = useState({ scada_make: "", plc_make: "", job_code: "" });
 
   const formatAmount = (amount) => new Intl.NumberFormat("en-IN", {
     style: "currency",
@@ -52,7 +52,8 @@ export default function EditAMC() {
         setAmc(amcRes.data);
         setAmcEdit({
           scada_make: amcRes.data.scada_make || "",
-          plc_make: amcRes.data.plc_make || ""
+          plc_make: amcRes.data.plc_make || "",
+          job_code: amcRes.data.job_code || ""
         });
 
         const scheduleRes = await api.get(`/amc/schedule/${id}`);
@@ -147,14 +148,16 @@ export default function EditAMC() {
       setSavingAmc(true);
       await api.put(`/amc/${id}`, {
         scada_make: amcEdit.scada_make || null,
-        plc_make: amcEdit.plc_make || null
+        plc_make: amcEdit.plc_make || null,
+        job_code: amcEdit.job_code || null
       });
       setAmc((current) => ({
         ...current,
         scada_make: amcEdit.scada_make || null,
-        plc_make: amcEdit.plc_make || null
+        plc_make: amcEdit.plc_make || null,
+        job_code: amcEdit.job_code || null
       }));
-      setMessage({ open: true, severity: "success", text: "SCADA / PLC make updated successfully" });
+      setMessage({ open: true, severity: "success", text: "SCADA / PLC / Job Code updated successfully" });
     } catch (err) {
       setMessage({
         open: true,
@@ -214,6 +217,16 @@ export default function EditAMC() {
                 onChange={(e) => setAmcEdit({ ...amcEdit, plc_make: e.target.value })}
                 disabled={savingAmc}
                 placeholder="e.g. ABB, Siemens, Phoenix"
+              />
+            </Grid>
+            <Grid item xs={12} md={6}>
+              <TextField
+                fullWidth
+                label="Job Code"
+                value={amcEdit.job_code}
+                onChange={(e) => setAmcEdit({ ...amcEdit, job_code: e.target.value })}
+                disabled={savingAmc}
+                placeholder="e.g. AMC-2026-001"
               />
             </Grid>
             <Grid item xs={12}>

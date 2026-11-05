@@ -39,7 +39,8 @@ export default function AMCForm() {
     po_no: "",
     po_date: "",
     scada_make: "",
-    plc_make: ""
+    plc_make: "",
+    job_code: ""
   });
 
   const handleChange = (e) => {
@@ -113,7 +114,8 @@ export default function AMCForm() {
       po_number: form.po_no,
       po_date: form.po_date || null,
       scada_make: form.scada_make || null,
-      plc_make: form.plc_make || null
+      plc_make: form.plc_make || null,
+      job_code: form.job_code || null
     };
 
     // Create AMC
@@ -262,6 +264,18 @@ export default function AMCForm() {
                 value={form.plc_make}
                 onChange={handleChange}
                 placeholder="e.g. ABB, Siemens, Phoenix"
+              />
+            </Grid>
+
+            {/* Job Code */}
+            <Grid size={{ xs: 12, md: 6 }}>
+              <TextField
+                fullWidth
+                label="Job Code"
+                name="job_code"
+                value={form.job_code}
+                onChange={handleChange}
+                placeholder="e.g. AMC-2026-001"
               />
             </Grid>
 

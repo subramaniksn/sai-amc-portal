@@ -70,7 +70,8 @@ router.post("/", verifyToken, isAdmin, async (req, res) => {
       po_number,
       po_date,
       scada_make,
-      plc_make
+      plc_make,
+      job_code
     } = req.body;
 
     const totalAmount = total_amount_without_gst === "" || total_amount_without_gst == null
@@ -131,9 +132,10 @@ router.post("/", verifyToken, isAdmin, async (req, res) => {
         total_amount_without_gst,
         balance_amount_without_gst,
         scada_make,
-        plc_make
+        plc_make,
+        job_code
       )
-      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)
+      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)
       RETURNING *
     `, [
       customer_name,
@@ -150,7 +152,8 @@ router.post("/", verifyToken, isAdmin, async (req, res) => {
       totalAmount,
       totalAmount,
       scada_make || null,
-      plc_make || null
+      plc_make || null,
+      job_code || null
     ]);
 
     const amcId = amc.rows[0].id;
@@ -470,6 +473,7 @@ router.get("/export", verifyToken, async (req, res) => {
         a.plant_name,
         a.scada_make,
         a.plc_make,
+        a.job_code,
         MAX(i.po_number) AS po_number,
         TO_CHAR(MAX(i.po_date), 'DD-MM-YYYY') AS po_date,
         TO_CHAR(a.amc_start_date, 'DD-MM-YYYY') AS amc_start_date,
@@ -514,6 +518,7 @@ router.get("/export", verifyToken, async (req, res) => {
         a.plant_name,
         a.scada_make,
         a.plc_make,
+        a.job_code,
         a.amc_start_date,
         a.amc_end_date
       ORDER BY a.customer_name
@@ -529,6 +534,7 @@ router.get("/export", verifyToken, async (req, res) => {
       { header: "Plant Name",      key: "plant_name",      width: 25 },
       { header: "SCADA Make",      key: "scada_make",      width: 20 },
       { header: "PLC Make",        key: "plc_make",        width: 18 },
+      { header: "Job Code",        key: "job_code",        width: 18 },
       { header: "PO Number",       key: "po_number",       width: 20 },
       { header: "PO Date",         key: "po_date",         width: 18 },
       { header: "AMC Start Date",  key: "amc_start_date",  width: 18 },
@@ -699,7 +705,8 @@ router.put("/:id", verifyToken, isAdmin, async (req, res) => {
       po_number,
       po_date,
       scada_make,
-      plc_make
+      plc_make,
+      job_code
     } = req.body;
 
     const totalAmount = total_amount_without_gst === "" || total_amount_without_gst == null
@@ -737,7 +744,8 @@ router.put("/:id", verifyToken, isAdmin, async (req, res) => {
         total_amount_without_gst = COALESCE($13, total_amount_without_gst),
         balance_amount_without_gst = COALESCE($13, balance_amount_without_gst),
         scada_make = COALESCE($14, scada_make),
-        plc_make = COALESCE($15, plc_make)
+        plc_make = COALESCE($15, plc_make),
+        job_code = COALESCE($16, job_code)
       WHERE id = $1
       RETURNING *
     `, [
@@ -755,7 +763,8 @@ router.put("/:id", verifyToken, isAdmin, async (req, res) => {
       invoice_raise_timing,
       totalAmount,
       scada_make === "" ? null : scada_make,
-      plc_make === "" ? null : plc_make
+      plc_make === "" ? null : plc_make,
+      job_code === "" ? null : job_code
     ]);
 
     await client.query("COMMIT");

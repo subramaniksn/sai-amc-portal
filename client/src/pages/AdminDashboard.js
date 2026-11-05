@@ -532,7 +532,7 @@ export default function AdminDashboard() {
               <Table stickyHeader>
                 <TableHead>
                   <TableRow>
-                    {["Plant Name", "Customer", "SCADA Make", "PLC Make", "AMC Start", "AMC End", "PO Number"].map(
+                    {["Plant Name", "Customer", "SCADA Make", "PLC Make", "Job Code", "AMC Start", "AMC End", "PO Number"].map(
                       (head) => (
                         <TableCell
                           key={head}
@@ -555,6 +555,7 @@ export default function AdminDashboard() {
                       <TableCell>{s.customer_name}</TableCell>
                       <TableCell>{s.scada_make || "N/A"}</TableCell>
                       <TableCell>{s.plc_make || "N/A"}</TableCell>
+                      <TableCell>{s.job_code || "N/A"}</TableCell>
                       <TableCell>
                         {s.amc_start_date ? new Date(s.amc_start_date).toLocaleDateString("en-IN") : "N/A"}
                       </TableCell>

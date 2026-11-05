@@ -481,7 +481,7 @@ export default function ManagerDashboard() {
             <Table stickyHeader>
               <TableHead>
                 <TableRow>
-                  {["Plant Name", "Customer", "SCADA Make", "PLC Make", "AMC Start", "AMC End", "PO Number"].map(
+                  {["Plant Name", "Customer", "SCADA Make", "PLC Make", "Job Code", "AMC Start", "AMC End", "PO Number"].map(
                     (head) => (
                       <TableCell
                         key={head}
@@ -504,6 +504,7 @@ export default function ManagerDashboard() {
                     <TableCell>{s.customer_name}</TableCell>
                     <TableCell>{s.scada_make || "N/A"}</TableCell>
                     <TableCell>{s.plc_make || "N/A"}</TableCell>
+                    <TableCell>{s.job_code || "N/A"}</TableCell>
                     <TableCell>
                       {s.amc_start_date ? new Date(s.amc_start_date).toLocaleDateString("en-IN") : "N/A"}
                     </TableCell>
@@ -606,6 +607,7 @@ export default function ManagerDashboard() {
                   <TableCell align="center">MW</TableCell>
                   <TableCell>SCADA Make</TableCell>
                   <TableCell>PLC Make</TableCell>
+                  <TableCell>Job Code</TableCell>
                   <TableCell>Billing Address</TableCell>
                   <TableCell>Contact Person</TableCell>
                   <TableCell align="center">PO No</TableCell>
@@ -623,6 +625,7 @@ export default function ManagerDashboard() {
                     <TableCell align="center">{site.plantcapacity_mw || "0"}</TableCell>
                     <TableCell>{site.scada_make || "N/A"}</TableCell>
                     <TableCell>{site.plc_make || "N/A"}</TableCell>
+                    <TableCell>{site.job_code || "N/A"}</TableCell>
                     <TableCell>{site.billing_address?.split(",")[0] || "N/A"}</TableCell>
                     <TableCell>{site.contact_person || "N/A"}</TableCell>
                     <TableCell align="center">{site.po_number || "N/A"}</TableCell>

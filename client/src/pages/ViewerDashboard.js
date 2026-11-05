@@ -447,6 +447,7 @@ export default function ViewerDashboard() {
                   <TableCell align="center">MW</TableCell>
                   <TableCell>SCADA Make</TableCell>
                   <TableCell>PLC Make</TableCell>
+                  <TableCell>Job Code</TableCell>
                   <TableCell>Billing Address</TableCell>
                   <TableCell>Contact Person</TableCell>
                   <TableCell align="center">PO No</TableCell>
@@ -464,6 +465,7 @@ export default function ViewerDashboard() {
                     <TableCell align="center">{site.plantcapacity_mw || "0"}</TableCell>
                     <TableCell>{site.scada_make || "N/A"}</TableCell>
                     <TableCell>{site.plc_make || "N/A"}</TableCell>
+                    <TableCell>{site.job_code || "N/A"}</TableCell>
                     <TableCell>{site.billing_address?.split(",")[0] || "N/A"}</TableCell>
                     <TableCell>{site.contact_person || "N/A"}</TableCell>
                     <TableCell align="center">{site.po_number || "N/A"}</TableCell>
