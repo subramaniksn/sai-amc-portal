@@ -199,6 +199,9 @@ export default function AdminDashboard() {
           .split(",")
           .map((m) => m.trim())
           .filter(Boolean);
+        if (selectedMake === "Not Specified") {
+          return makes.length === 0;
+        }
         return makes.includes(selectedMake);
       })
     : [];
