@@ -71,7 +71,9 @@ router.post("/", verifyToken, isAdmin, async (req, res) => {
       po_date,
       scada_make,
       plc_make,
-      job_code
+      job_code,
+      invoice_date,
+      payment_date
     } = req.body;
 
     const totalAmount = total_amount_without_gst === "" || total_amount_without_gst == null
@@ -706,7 +708,9 @@ router.put("/:id", verifyToken, isAdmin, async (req, res) => {
       po_date,
       scada_make,
       plc_make,
-      job_code
+      job_code,
+      invoice_date,
+      payment_date
     } = req.body;
 
     const totalAmount = total_amount_without_gst === "" || total_amount_without_gst == null
@@ -766,6 +770,22 @@ router.put("/:id", verifyToken, isAdmin, async (req, res) => {
       plc_make === "" ? null : plc_make,
       job_code === "" ? null : job_code
     ]);
+
+    // Update invoice dates on the latest invoice schedule for this AMC
+    if (invoice_date || payment_date) {
+      await client.query(`
+        UPDATE invoice_schedule
+        SET
+          invoice_date = COALESCE($2, invoice_date),
+          payment_date = COALESCE($3, payment_date)
+        WHERE id = (
+          SELECT id FROM invoice_schedule
+          WHERE amc_id = $1
+          ORDER BY period_number DESC
+          LIMIT 1
+        )
+      `, [id, invoice_date || null, payment_date || null]);
+    }
 
     await client.query("COMMIT");
     res.json({ message: "AMC updated successfully" });

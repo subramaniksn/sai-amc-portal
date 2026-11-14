@@ -57,7 +57,7 @@ export default function AdminDashboard() {
   const [message, setMessage] = useState({ open: false, severity: "success", text: "" });
   const [quickEditOpen, setQuickEditOpen] = useState(false);
   const [quickEditSite, setQuickEditSite] = useState(null);
-  const [quickEditForm, setQuickEditForm] = useState({ job_code: "", scada_make: "", plc_make: "", total_amount_without_gst: "" });
+  const [quickEditForm, setQuickEditForm] = useState({ job_code: "", scada_make: "", plc_make: "", invoice_date: "", payment_date: "" });
   const [quickEditSaving, setQuickEditSaving] = useState(false);
 
   const navigate = useNavigate();
@@ -231,7 +231,8 @@ export default function AdminDashboard() {
       job_code: site.job_code || "",
       scada_make: site.scada_make || "",
       plc_make: site.plc_make || "",
-      total_amount_without_gst: site.total_amount_without_gst || ""
+      invoice_date: site.invoice_date || "",
+      payment_date: site.payment_date || ""
     });
     setQuickEditOpen(true);
   };
@@ -248,7 +249,8 @@ export default function AdminDashboard() {
         job_code: quickEditForm.job_code || null,
         scada_make: quickEditForm.scada_make || null,
         plc_make: quickEditForm.plc_make || null,
-        total_amount_without_gst: quickEditForm.total_amount_without_gst === "" ? null : Number(quickEditForm.total_amount_without_gst)
+        invoice_date: quickEditForm.invoice_date || null,
+        payment_date: quickEditForm.payment_date || null
       });
       setMessage({ open: true, severity: "success", text: "Site details updated successfully" });
       setQuickEditOpen(false);
@@ -812,11 +814,19 @@ export default function AdminDashboard() {
             />
             <TextField
               fullWidth
-              label="Total Amount (₹)"
-              type="number"
-              value={quickEditForm.total_amount_without_gst}
-              onChange={(e) => handleQuickEditChange("total_amount_without_gst", e.target.value)}
-              inputProps={{ min: 0 }}
+              label="Invoice Created Date"
+              type="date"
+              value={quickEditForm.invoice_date}
+              onChange={(e) => handleQuickEditChange("invoice_date", e.target.value)}
+              InputLabelProps={{ shrink: true }}
+            />
+            <TextField
+              fullWidth
+              label="Payment Received Date"
+              type="date"
+              value={quickEditForm.payment_date}
+              onChange={(e) => handleQuickEditChange("payment_date", e.target.value)}
+              InputLabelProps={{ shrink: true }}
             />
           </Box>
         </DialogContent>
