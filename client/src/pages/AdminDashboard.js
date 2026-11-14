@@ -11,6 +11,12 @@ import {
   Box,
   Alert,
   Chip,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  Snackbar,
+  TextField,
   FormControl,
   InputLabel,
   Select,
@@ -48,6 +54,11 @@ export default function AdminDashboard() {
   const [showChart, setShowChart] = useState(false);
   const [selectedMake, setSelectedMake] = useState(null);
   const [makeType, setMakeType] = useState(null); // 'scada' | 'plc'
+  const [message, setMessage] = useState({ open: false, severity: "success", text: "" });
+  const [quickEditOpen, setQuickEditOpen] = useState(false);
+  const [quickEditSite, setQuickEditSite] = useState(null);
+  const [quickEditForm, setQuickEditForm] = useState({ job_code: "", scada_make: "", plc_make: "", total_amount_without_gst: "" });
+  const [quickEditSaving, setQuickEditSaving] = useState(false);
 
   const navigate = useNavigate();
   const user = JSON.parse(localStorage.getItem("user") || "{}");
@@ -209,6 +220,49 @@ export default function AdminDashboard() {
   const handleMakeClick = (make, type) => {
     setSelectedMake(make);
     setMakeType(type);
+  };
+
+  // ===============================
+  // QUICK EDIT DIALOG
+  // ===============================
+  const handleQuickEditOpen = (site) => {
+    setQuickEditSite(site);
+    setQuickEditForm({
+      job_code: site.job_code || "",
+      scada_make: site.scada_make || "",
+      plc_make: site.plc_make || "",
+      total_amount_without_gst: site.total_amount_without_gst || ""
+    });
+    setQuickEditOpen(true);
+  };
+
+  const handleQuickEditChange = (field, value) => {
+    setQuickEditForm({ ...quickEditForm, [field]: value });
+  };
+
+  const handleQuickEditSave = async () => {
+    if (!quickEditSite) return;
+    setQuickEditSaving(true);
+    try {
+      await api.put(`/amc/${quickEditSite.id}`, {
+        job_code: quickEditForm.job_code || null,
+        scada_make: quickEditForm.scada_make || null,
+        plc_make: quickEditForm.plc_make || null,
+        total_amount_without_gst: quickEditForm.total_amount_without_gst === "" ? null : Number(quickEditForm.total_amount_without_gst)
+      });
+      setMessage({ open: true, severity: "success", text: "Site details updated successfully" });
+      setQuickEditOpen(false);
+      // Refresh data
+      fetchData(period === "all" ? "" : period.split("-")[0]);
+    } catch (err) {
+      setMessage({
+        open: true,
+        severity: "error",
+        text: err.response?.data?.error || err.message || "Unable to update site details"
+      });
+    } finally {
+      setQuickEditSaving(false);
+    }
   };
 
   const formatCurrency = (num) =>
@@ -684,13 +738,24 @@ export default function AdminDashboard() {
                   </TableCell>
                   <TableCell>
                     {role?.toLowerCase() === "admin" && (
-                      <Button
-                        variant="contained"
-                        size="small"
-                        onClick={() => navigate(`/edit/${d.id}`)}
-                      >
-                        Edit
-                      </Button>
+                      <>
+                        <Button
+                          variant="contained"
+                          size="small"
+                          color="primary"
+                          onClick={() => handleQuickEditOpen(d)}
+                          sx={{ mr: 1 }}
+                        >
+                          Quick Edit
+                        </Button>
+                        <Button
+                          variant="outlined"
+                          size="small"
+                          onClick={() => navigate(`/edit/${d.id}`)}
+                        >
+                          Edit Invoices
+                        </Button>
+                      </>
                     )}
                   </TableCell>
                 </TableRow>
@@ -699,6 +764,95 @@ export default function AdminDashboard() {
           </TableBody>
         </Table>
       </TableContainer>
+
+      {/* QUICK EDIT DIALOG */}
+      <Dialog
+        open={quickEditOpen}
+        onClose={() => setQuickEditOpen(false)}
+        maxWidth="sm"
+        fullWidth
+      >
+        <DialogTitle sx={{ py: 2 }}>
+          Quick Edit — {quickEditSite?.plant_name}
+        </DialogTitle>
+        <DialogContent sx={{ py: 2 }}>
+          <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
+            <TextField
+              fullWidth
+              label="Customer"
+              value={quickEditSite?.customer_name || ""}
+              disabled
+            />
+            <TextField
+              fullWidth
+              label="Plant Name"
+              value={quickEditSite?.plant_name || ""}
+              disabled
+            />
+            <TextField
+              fullWidth
+              label="Job Code"
+              value={quickEditForm.job_code}
+              onChange={(e) => handleQuickEditChange("job_code", e.target.value)}
+              placeholder="e.g. AMC-2026-001"
+            />
+            <TextField
+              fullWidth
+              label="SCADA Make (comma-separated)"
+              value={quickEditForm.scada_make}
+              onChange={(e) => handleQuickEditChange("scada_make", e.target.value)}
+              placeholder="e.g. ABB, Siemens"
+            />
+            <TextField
+              fullWidth
+              label="PLC Make (comma-separated)"
+              value={quickEditForm.plc_make}
+              onChange={(e) => handleQuickEditChange("plc_make", e.target.value)}
+              placeholder="e.g. ABB, Phoenix"
+            />
+            <TextField
+              fullWidth
+              label="Total Amount (₹)"
+              type="number"
+              value={quickEditForm.total_amount_without_gst}
+              onChange={(e) => handleQuickEditChange("total_amount_without_gst", e.target.value)}
+              inputProps={{ min: 0 }}
+            />
+          </Box>
+        </DialogContent>
+        <DialogActions sx={{ py: 1, px: 3 }}>
+          <Button
+            variant="outlined"
+            onClick={() => setQuickEditOpen(false)}
+            disabled={quickEditSaving}
+          >
+            Cancel
+          </Button>
+          <Button
+            variant="contained"
+            color="primary"
+            onClick={handleQuickEditSave}
+            disabled={quickEditSaving}
+          >
+            {quickEditSaving ? "Saving..." : "Save Changes"}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Snackbar for messages */}
+      <Snackbar
+        open={message.open}
+        autoHideDuration={4000}
+        onClose={() => setMessage((current) => ({ ...current, open: false }))}
+      >
+        <Alert
+          severity={message.severity}
+          variant="filled"
+          onClose={() => setMessage((current) => ({ ...current, open: false }))}
+        >
+          {message.text}
+        </Alert>
+      </Snackbar>
 
     </Container>
   );
