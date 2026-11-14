@@ -588,10 +588,10 @@ export default function AdminDashboard() {
                           variant="contained"
                           size="small"
                           color="primary"
-                          onClick={() => handleQuickEditOpen(site)}
+                          onClick={() => navigate(`/edit/${site.id}`)}
                           sx={{ mr: 1 }}
                         >
-                          Quick Edit
+                          Edit Invoices
                         </Button>
                       </TableCell>
                     </TableRow>
