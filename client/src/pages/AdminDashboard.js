@@ -57,7 +57,7 @@ export default function AdminDashboard() {
   const [message, setMessage] = useState({ open: false, severity: "success", text: "" });
   const [quickEditOpen, setQuickEditOpen] = useState(false);
   const [quickEditSite, setQuickEditSite] = useState(null);
-  const [quickEditForm, setQuickEditForm] = useState({ job_code: "", scada_make: "", plc_make: "", invoice_date: "", payment_date: "" });
+  const [quickEditForm, setQuickEditForm] = useState({ job_code: "", scada_make: "", plc_make: "", invoice_number: "", invoice_date: "", payment_date: "" });
   const [quickEditSaving, setQuickEditSaving] = useState(false);
 
   const navigate = useNavigate();
@@ -231,6 +231,7 @@ export default function AdminDashboard() {
       job_code: site.job_code || "",
       scada_make: site.scada_make || "",
       plc_make: site.plc_make || "",
+      invoice_number: site.po_number || "",
       invoice_date: site.invoice_date || "",
       payment_date: site.payment_date || ""
     });
@@ -249,6 +250,7 @@ export default function AdminDashboard() {
         job_code: quickEditForm.job_code || null,
         scada_make: quickEditForm.scada_make || null,
         plc_make: quickEditForm.plc_make || null,
+        invoice_number: quickEditForm.invoice_number || null,
         invoice_date: quickEditForm.invoice_date || null,
         payment_date: quickEditForm.payment_date || null
       });
@@ -797,6 +799,13 @@ export default function AdminDashboard() {
               value={quickEditForm.job_code}
               onChange={(e) => handleQuickEditChange("job_code", e.target.value)}
               placeholder="e.g. AMC-2026-001"
+            />
+            <TextField
+              fullWidth
+              label="Invoice Number"
+              value={quickEditForm.invoice_number}
+              onChange={(e) => handleQuickEditChange("invoice_number", e.target.value)}
+              placeholder="e.g. 212"
             />
             <TextField
               fullWidth

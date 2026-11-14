@@ -73,7 +73,8 @@ router.post("/", verifyToken, isAdmin, async (req, res) => {
       plc_make,
       job_code,
       invoice_date,
-      payment_date
+      payment_date,
+      invoice_number
     } = req.body;
 
     const totalAmount = total_amount_without_gst === "" || total_amount_without_gst == null
@@ -223,6 +224,7 @@ router.get("/", verifyToken, async (req, res) => {
       SELECT 
         a.*,
         MAX(i.po_number) AS po_number,
+        MAX(i.invoice_number) AS invoice_number,
         MAX(i.po_date) AS po_date
       FROM amc_site_entry a
       LEFT JOIN invoice_schedule i ON a.id = i.amc_id
@@ -710,7 +712,8 @@ router.put("/:id", verifyToken, isAdmin, async (req, res) => {
       plc_make,
       job_code,
       invoice_date,
-      payment_date
+      payment_date,
+      invoice_number
     } = req.body;
 
     const totalAmount = total_amount_without_gst === "" || total_amount_without_gst == null
@@ -772,10 +775,11 @@ router.put("/:id", verifyToken, isAdmin, async (req, res) => {
     ]);
 
     // Update invoice dates on the latest invoice schedule for this AMC
-    if (invoice_date || payment_date) {
+    if (invoice_date || payment_date || invoice_number) {
       await client.query(`
         UPDATE invoice_schedule
         SET
+          invoice_number = COALESCE($4, invoice_number),
           invoice_date = COALESCE($2, invoice_date),
           payment_date = COALESCE($3, payment_date)
         WHERE id = (
@@ -784,7 +788,7 @@ router.put("/:id", verifyToken, isAdmin, async (req, res) => {
           ORDER BY period_number DESC
           LIMIT 1
         )
-      `, [id, invoice_date || null, payment_date || null]);
+      `, [id, invoice_date || null, payment_date || null, invoice_number || null]);
     }
 
     await client.query("COMMIT");
