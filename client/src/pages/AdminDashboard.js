@@ -54,6 +54,7 @@ export default function AdminDashboard() {
   const [showChart, setShowChart] = useState(false);
   const [selectedMake, setSelectedMake] = useState(null);
   const [makeType, setMakeType] = useState(null); // 'scada' | 'plc'
+  const [selectedCustomer, setSelectedCustomer] = useState(null);
   const [message, setMessage] = useState({ open: false, severity: "success", text: "" });
   const [quickEditOpen, setQuickEditOpen] = useState(false);
   const [quickEditSite, setQuickEditSite] = useState(null);
@@ -202,7 +203,20 @@ export default function AdminDashboard() {
     }, {})
   ).sort((a, b) => b[1] - a[1]);
 
-  // Sites for selected make (click a make in the counts below to view its sites)
+  // Customer counts — distinct plants per customer
+  const customerCounts = Object.entries(
+    distinctSites(data).reduce((acc, s) => {
+      const customer = s.customer_name || "Not Specified";
+      acc[customer] = (acc[customer] || 0) + 1;
+      return acc;
+    }, {})
+  ).sort((a, b) => b[1] - a[1]);
+
+  // Sites for selected customer
+  const customerSiteList = selectedCustomer
+    ? distinctSites(data).filter((s) => s.customer_name === selectedCustomer)
+    : [];
+
   const makeSites = selectedMake
     ? distinctSites(data).filter((s) => {
         const field = makeType === "scada" ? "scada_make" : "plc_make";
@@ -220,6 +234,12 @@ export default function AdminDashboard() {
   const handleMakeClick = (make, type) => {
     setSelectedMake(make);
     setMakeType(type);
+  };
+
+  const handleCustomerClick = (customer) => {
+    setSelectedCustomer(customer);
+    setSelectedMake(null);
+    setMakeType(null);
   };
 
   // ===============================
@@ -472,6 +492,116 @@ export default function AdminDashboard() {
           </Card>
         </Grid>
       </Grid>
+
+      {/* Customer — Quick Access */}
+      <Card sx={{ mb: 4 }}>
+        <CardContent>
+          <Typography variant="h6" gutterBottom>
+            Customer — Plant Count & Quick Edit
+          </Typography>
+          {selectedCustomer && (
+            <Box sx={{ mb: 2 }}>
+              <Button
+                variant="text"
+                onClick={() => setSelectedCustomer(null)}
+                startIcon={<ArrowBackIcon />}
+              >
+                Back to all customers
+              </Button>
+              <Typography variant="subtitle2" color="text.secondary" sx={{ ml: 2, display: "inline-block" }}>
+                Sites for: <b>{selectedCustomer}</b>
+              </Typography>
+            </Box>
+          )}
+          <Grid container spacing={1}>
+            {customerCounts.length > 0 ? (
+              customerCounts.map(([customer, count]) => (
+                <Grid item key={customer} xs={12} sm={6}>
+                  <Button
+                    variant="contained"
+                    fullWidth
+                    startIcon={
+                      selectedCustomer === customer ? <CheckCircleIcon /> : undefined
+                    }
+                    color={selectedCustomer === customer ? "primary" : "default"}
+                    onClick={() => handleCustomerClick(customer)}
+                    sx={{
+                      height: 48,
+                      justifyContent: "space-between",
+                      fontWeight: selectedCustomer === customer ? "bold" : "normal",
+                      textOverflow: "ellipsis",
+                      overflow: "hidden",
+                      whiteSpace: "nowrap"
+                    }}
+                  >
+                    {customer}
+                    <Box sx={{ ml: 1 }}>{count}</Box>
+                  </Button>
+                </Grid>
+              ))
+            ) : (
+              <Typography color="text.secondary">No customers recorded</Typography>
+            )}
+          </Grid>
+        </CardContent>
+      </Card>
+
+      {/* Sites for selected customer */}
+      {selectedCustomer && customerSiteList.length > 0 && (
+        <Card sx={{ mb: 4 }}>
+          <CardContent>
+            <Typography variant="h6" gutterBottom>
+              Sites — {selectedCustomer}
+            </Typography>
+            <TableContainer component={Paper}>
+              <Table stickyHeader>
+                <TableHead>
+                  <TableRow>
+                    {["Plant Name", "SCADA Make", "PLC Make", "Job Code", "Invoice Number", "Invoice Date", "Payment Date", "Action"].map(
+                      (head) => (
+                        <TableCell
+                          key={head}
+                          sx={{
+                            backgroundColor: "#1976d2 !important",
+                            color: "#fff !important",
+                            fontWeight: "bold"
+                          }}
+                        >
+                          {head}
+                        </TableCell>
+                      )
+                    )}
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {customerSiteList.map((site) => (
+                    <TableRow key={site.id} sx={{ cursor: "pointer" }}>
+                      <TableCell>{site.plant_name}</TableCell>
+                      <TableCell>{site.scada_make || "N/A"}</TableCell>
+                      <TableCell>{site.plc_make || "N/A"}</TableCell>
+                      <TableCell>{site.job_code || "N/A"}</TableCell>
+                      <TableCell>{site.invoice_number || "N/A"}</TableCell>
+                      <TableCell>{site.invoice_date || "N/A"}</TableCell>
+                      <TableCell>{site.payment_date || "N/A"}</TableCell>
+                      <TableCell>
+                        <Button
+                          variant="contained"
+                          size="small"
+                          color="primary"
+                          onClick={() => handleQuickEditOpen(site)}
+                          sx={{ mr: 1 }}
+                        >
+                          Quick Edit
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </TableContainer>
+          </CardContent>
+        </Card>
+      )}
 
       {/* SCADA / PLC Make Counts */}
       <Card sx={{ mb: 4 }}>
