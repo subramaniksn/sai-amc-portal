@@ -330,7 +330,10 @@ export default function EditAMC() {
                   label="Payment Date"
                   InputLabelProps={{ shrink: true }}
                   value={row.payment_date ? formatDate(row.payment_date) : ""}
-                  disabled
+                  disabled={row._was_payment_received}
+                  onChange={(e) =>
+                    handleChange(index, "payment_date", e.target.value)
+                  }
                   fullWidth
                 />
               </Grid>
