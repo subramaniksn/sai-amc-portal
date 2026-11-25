@@ -77,11 +77,6 @@ export default function EditAMC() {
     const updated = [...schedule];
     updated[index][field] = value;
 
-    // Auto set payment date when payment received
-    if (field === "payment_received" && value === true && !updated[index].payment_date) {
-      updated[index].payment_date = new Date().toISOString().split("T")[0];
-    }
-
     setSchedule(updated);
 
   };
@@ -111,7 +106,8 @@ export default function EditAMC() {
         po_number: row.po_number || null,
         po_date: row.po_date || null,
         invoice_number: row.invoice_number || null,
-        invoice_date: row.invoice_date || null
+        invoice_date: row.invoice_date || null,
+        payment_date: row.payment_date || null
       };
       
       console.log("✅ Saving rowId:", rowId, payload);

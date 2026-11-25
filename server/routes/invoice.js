@@ -13,7 +13,8 @@ router.put("/update/:id", verifyToken, isAdmin, async (req, res) => {
       po_number = null,
       po_date = null,
       invoice_number = null,
-      invoice_date = null
+      invoice_date = null,
+      payment_date = null
     } = req.body;
 
     const parseDate = (dateStr) => {
@@ -45,6 +46,7 @@ router.put("/update/:id", verifyToken, isAdmin, async (req, res) => {
       parseDate(po_date),
       invoice_number || null,
       parseDate(invoice_date),
+      parseDate(payment_date),
       id
     ];
 
@@ -55,12 +57,13 @@ router.put("/update/:id", verifyToken, isAdmin, async (req, res) => {
         po_date = $2,
         invoice_number = $3,
         invoice_date = $4,
+        payment_date = $5,
         invoice_raised = CASE
             WHEN payment_received = true THEN invoice_raised
             WHEN $3::text IS NOT NULL AND $3::text <> '' THEN true
             ELSE false
         END
-      WHERE id = $5
+      WHERE id = $6
     `, params);
 
     if (result.rowCount === 0) {

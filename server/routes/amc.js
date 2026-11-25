@@ -365,7 +365,6 @@ router.put("/receive/:scheduleId", verifyToken, isAdmin, async (req, res) => {
       UPDATE invoice_schedule
       SET
         payment_received = TRUE,
-        payment_date = CURRENT_DATE,
         payment_notification_sent = TRUE
       WHERE id = $1
     `, [scheduleId]);
