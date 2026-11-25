@@ -366,7 +366,7 @@ export default function EditAMC() {
                   variant="contained"
                   color="primary"
                   onClick={() => saveRow(row, row.id)}
-                  disabled={row._was_payment_received || savingId === row.id}
+                  disabled={savingId === row.id}
                   fullWidth
                 >
                   {savingId === row.id ? "Saving..." : "Save"}
