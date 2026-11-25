@@ -37,7 +37,7 @@ router.put("/update/:id", verifyToken, isAdmin, async (req, res) => {
       return res.status(404).json({ error: "Invoice schedule not found" });
     }
 
-    if (existing.rows[0].payment_received) {
+    if (existing.rows[0].payment_received && !payment_date) {
       return res.status(409).json({ error: "Paid invoice schedules cannot be edited" });
     }
 

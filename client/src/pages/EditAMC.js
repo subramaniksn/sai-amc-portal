@@ -330,7 +330,7 @@ export default function EditAMC() {
                   label="Payment Date"
                   InputLabelProps={{ shrink: true }}
                   value={row.payment_date ? formatDate(row.payment_date) : ""}
-                  disabled={row._was_payment_received}
+                  disabled={false}
                   onChange={(e) =>
                     handleChange(index, "payment_date", e.target.value)
                   }
